@@ -16,21 +16,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: apps/agui/pnpm-lock.yaml
+          cache: 'npm'
+          cache-dependency-path: apps/agui/package-lock.json
 
       - name: Install dependencies
         working-directory: apps/agui
-        run: pnpm install --frozen-lockfile
+        run: npm ci --legacy-peer-deps
 
       - name: Run ESLint
         working-directory: apps/agui
@@ -50,21 +45,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: apps/agui/pnpm-lock.yaml
+          cache: 'npm'
+          cache-dependency-path: apps/agui/package-lock.json
 
       - name: Install dependencies
         working-directory: apps/agui
-        run: pnpm install --frozen-lockfile
+        run: npm ci --legacy-peer-deps
 
       - name: Run TypeScript type checking
         working-directory: apps/agui
@@ -76,25 +66,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: apps/agui/pnpm-lock.yaml
+          cache: 'npm'
+          cache-dependency-path: apps/agui/package-lock.json
 
       - name: Install dependencies
         working-directory: apps/agui
-        run: pnpm install --frozen-lockfile
+        run: npm ci --legacy-peer-deps
 
       - name: Run tests with coverage
         working-directory: apps/agui
-        run: pnpm test --coverage --passWithNoTests
+        run: npm test -- --coverage --passWithNoTests
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
@@ -109,25 +94,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: apps/agui/pnpm-lock.yaml
+          cache: 'npm'
+          cache-dependency-path: apps/agui/package-lock.json
 
       - name: Install dependencies
         working-directory: apps/agui
-        run: pnpm install --frozen-lockfile
+        run: npm ci --legacy-peer-deps
 
       - name: Build application
         working-directory: apps/agui
-        run: pnpm build
+        run: npm run build
         env:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
           NEXT_PUBLIC_MANAGER_URL: http://localhost:8888
@@ -149,27 +129,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: apps/agui/pnpm-lock.yaml
+          cache: 'npm'
+          cache-dependency-path: apps/agui/package-lock.json
 
       - name: Install dependencies
         working-directory: apps/agui
-        run: pnpm install --frozen-lockfile
+        run: npm ci --legacy-peer-deps
 
       - name: Build and analyze bundle
         working-directory: apps/agui
         run: |
           # Build with bundle analyzer when configured
-          ANALYZE=true pnpm build || pnpm build
+          ANALYZE=true npm run build || npm run build
         env:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
 
@@ -185,25 +160,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: apps/agui/pnpm-lock.yaml
+          cache: 'npm'
+          cache-dependency-path: apps/agui/package-lock.json
 
       - name: Install dependencies
         working-directory: apps/agui
-        run: pnpm install --frozen-lockfile
+        run: npm ci --legacy-peer-deps
 
       - name: Build application
         working-directory: apps/agui
-        run: pnpm build
+        run: npm run build
         env:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
 
