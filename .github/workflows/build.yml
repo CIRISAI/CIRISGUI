@@ -70,8 +70,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.GHCR_USERNAME || github.actor }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.DEPLOY_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
@@ -89,7 +89,7 @@ jobs:
         with:
           context: .
           file: ./docker/Dockerfile.agui
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && (secrets.GHCR_TOKEN != '' || secrets.DEPLOY_TOKEN != '') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -99,22 +99,39 @@ jobs:
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             VCS_REF=${{ github.sha }}
             VERSION=${{ github.ref_name }}
+          outputs: ${{ github.event_name == 'pull_request' && 'type=docker,dest=/tmp/ciris-gui.tar' || '' }}
 
       - name: Build Summary
         if: always()
         run: |
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check if we have push permissions
+          if [[ -n "${{ secrets.GHCR_TOKEN }}" ]] || [[ -n "${{ secrets.DEPLOY_TOKEN }}" ]]; then
+            PUSH_ENABLED="true"
+          else
+            PUSH_ENABLED="false"
+          fi
+          
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "✅ Built images locally (PR - no push)" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$PUSH_ENABLED" == "true" ]]; then
+            echo "✅ Built and pushed images to ghcr.io" >> $GITHUB_STEP_SUMMARY
           else
-            echo "✅ Built and pushed images" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Built images successfully" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Push to ghcr.io skipped (no GHCR_TOKEN or DEPLOY_TOKEN secret configured)" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Image Tags:" >> $GITHUB_STEP_SUMMARY
-            echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | while read tag; do
-              echo "- \`$tag\`" >> $GITHUB_STEP_SUMMARY
-            done
+            echo "To enable pushing, add one of these secrets to the repository:" >> $GITHUB_STEP_SUMMARY
+            echo "- GHCR_TOKEN: Personal Access Token with write:packages scope" >> $GITHUB_STEP_SUMMARY
+            echo "- DEPLOY_TOKEN: Organization deploy token" >> $GITHUB_STEP_SUMMARY
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Image Tags (when pushed):" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' | while read tag; do
+            echo "- \`$tag\`" >> $GITHUB_STEP_SUMMARY
+          done
 
   security-scan:
     name: Security Scanning
