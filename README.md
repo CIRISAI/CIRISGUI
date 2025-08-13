@@ -2,6 +2,8 @@
 
 This sub-project provides a unified user interface and API runtime for the CIRIS agent.
 
+[![Build and Test](https://github.com/CIRISAI/CIRISGUI/actions/workflows/build.yml/badge.svg)](https://github.com/CIRISAI/CIRISGUI/actions/workflows/build.yml)
+
 ## Structure
 
 - **apps/agui** – Next.js 14 frontend using the CIRIS SDK
