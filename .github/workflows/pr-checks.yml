@@ -1,0 +1,215 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: apps/agui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: apps/agui
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        working-directory: apps/agui
+        run: |
+          # Run ESLint when configured
+          echo "ESLint will be configured and run here"
+
+      - name: Run Prettier check
+        working-directory: apps/agui
+        run: |
+          # Check formatting when configured
+          echo "Prettier checks will be added"
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: apps/agui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: apps/agui
+        run: pnpm install --frozen-lockfile
+
+      - name: Run TypeScript type checking
+        working-directory: apps/agui
+        run: npx tsc --noEmit
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: apps/agui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: apps/agui
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests with coverage
+        working-directory: apps/agui
+        run: pnpm test --coverage --passWithNoTests
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./apps/agui/coverage/coverage-final.json
+          flags: unittests
+          name: codecov-umbrella
+
+  build-test:
+    name: Build Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: apps/agui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: apps/agui
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        working-directory: apps/agui
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+          NEXT_PUBLIC_MANAGER_URL: http://localhost:8888
+
+      - name: Check build output
+        working-directory: apps/agui
+        run: |
+          if [ -d ".next" ]; then
+            echo "✅ Build output exists"
+            du -sh .next
+          else
+            echo "❌ Build output not found"
+            exit 1
+          fi
+
+  bundle-analysis:
+    name: Bundle Size Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: apps/agui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: apps/agui
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and analyze bundle
+        working-directory: apps/agui
+        run: |
+          # Build with bundle analyzer when configured
+          ANALYZE=true pnpm build || pnpm build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+
+      - name: Upload bundle stats
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-stats
+          path: apps/agui/.next/analyze/
+
+  lighthouse:
+    name: Lighthouse CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: apps/agui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: apps/agui
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        working-directory: apps/agui
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          configPath: './apps/agui/.lighthouserc.json'
+          uploadArtifacts: true
+          temporaryPublicStorage: true

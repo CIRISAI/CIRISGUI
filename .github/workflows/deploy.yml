@@ -1,0 +1,277 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deployment_strategy:
+        description: 'Deployment strategy'
+        required: true
+        default: 'canary'
+        type: choice
+        options:
+          - canary
+          - immediate
+          - manual
+
+permissions:
+  contents: read
+  packages: write
+  deployments: write
+
+jobs:
+  deploy:
+    name: Deploy GUI
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Create GitHub Deployment
+        id: deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: 'production',
+              description: 'Deploy CIRIS GUI',
+              auto_merge: false,
+              required_contexts: []
+            });
+            return deployment.data.id;
+
+      - name: Set Deployment Status - In Progress
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.result }},
+              state: 'in_progress',
+              environment_url: 'https://agents.ciris.ai',
+              description: 'Deployment in progress'
+            });
+
+      - name: Extract Deployment Metadata
+        id: metadata
+        run: |
+          # Extract changelog from commit message
+          CHANGELOG=$(git log -1 --pretty=format:"%s")
+          
+          # Determine risk level based on commit message patterns
+          if echo "$CHANGELOG" | grep -qiE "breaking|major|critical|security|urgent"; then
+            RISK_LEVEL="high"
+            STRATEGY="manual"  # High risk requires manual approval
+          elif echo "$CHANGELOG" | grep -qiE "fix|patch|bugfix|hotfix"; then
+            RISK_LEVEL="low"
+            STRATEGY="immediate"  # Low risk can deploy immediately
+          else
+            RISK_LEVEL="medium"
+            STRATEGY="canary"  # Medium risk uses canary deployment
+          fi
+          
+          # Override with manual input if provided
+          if [[ -n "${{ github.event.inputs.deployment_strategy }}" ]]; then
+            STRATEGY="${{ github.event.inputs.deployment_strategy }}"
+          fi
+          
+          # Extract version
+          VERSION="${{ github.sha }}"
+          VERSION="${VERSION:0:7}"
+          
+          echo "changelog=$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "risk_level=$RISK_LEVEL" >> $GITHUB_OUTPUT
+          echo "strategy=$STRATEGY" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Notify CIRISManager
+        id: notify
+        run: |
+          # Notify CIRISManager about the new GUI image
+          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST https://agents.ciris.ai/manager/v1/updates/notify \
+            -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"gui_image\": \"ghcr.io/${{ github.repository_owner }}/ciris-gui:latest\",
+              \"strategy\": \"${{ steps.metadata.outputs.strategy }}\",
+              \"source\": \"github-actions\",
+              \"commit_sha\": \"${{ github.sha }}\",
+              \"changelog\": \"${{ steps.metadata.outputs.changelog }}\",
+              \"risk_level\": \"${{ steps.metadata.outputs.risk_level }}\",
+              \"version\": \"${{ steps.metadata.outputs.version }}\",
+              \"component\": \"gui\"
+            }")
+          
+          # Extract HTTP status
+          http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d: -f2)
+          body=$(echo "$response" | sed '/HTTP_STATUS:/d')
+          
+          echo "Response body: $body"
+          echo "HTTP status: $http_status"
+          
+          # Check if successful
+          if [[ "$http_status" =~ ^2[0-9][0-9]$ ]]; then
+            echo "✅ Successfully notified CIRISManager"
+            deployment_id=$(echo "$body" | jq -r '.deployment_id // "unknown"')
+            echo "deployment_id=$deployment_id" >> $GITHUB_OUTPUT
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Failed to notify CIRISManager"
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Direct GUI Deployment (Fallback)
+        if: steps.notify.outputs.success != 'true'
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: 108.61.119.117
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            
+            echo "Direct deployment fallback - CIRISManager notification failed"
+            
+            # Navigate to deployment directory
+            cd /opt/ciris-gui || cd /home/ciris/CIRISGUI || exit 1
+            
+            # Pull latest image
+            echo "Pulling latest GUI image..."
+            docker pull ghcr.io/${{ github.repository_owner }}/ciris-gui:latest
+            
+            # Update container with zero-downtime deployment
+            echo "Updating GUI container..."
+            docker-compose up -d --no-deps --build ciris-gui
+            
+            # Health check
+            sleep 5
+            if docker ps | grep -q ciris-gui; then
+              echo "✅ GUI container is running"
+            else
+              echo "❌ GUI container failed to start"
+              docker logs ciris-gui --tail 50
+              exit 1
+            fi
+            
+            # Verify application is responding
+            if curl -f -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
+              echo "✅ GUI application is responding"
+            else
+              echo "⚠️ GUI application not responding on port 3000"
+            fi
+
+      - name: Monitor Deployment Status
+        if: steps.notify.outputs.success == 'true'
+        run: |
+          # Give CIRISManager time to process
+          sleep 10
+          
+          # Check deployment status
+          echo "Checking deployment status..."
+          status_response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" https://agents.ciris.ai/manager/v1/updates/status \
+            -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}")
+          
+          status_http=$(echo "$status_response" | grep "HTTP_STATUS:" | cut -d: -f2)
+          status_body=$(echo "$status_response" | sed '/HTTP_STATUS:/d')
+          
+          if [[ "$status_http" =~ ^2[0-9][0-9]$ ]]; then
+            echo "## Deployment Status" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            echo "$status_body" | jq '.' >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Set Deployment Status - Success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.result }},
+              state: 'success',
+              environment_url: 'https://agents.ciris.ai',
+              description: 'Deployment successful'
+            });
+
+      - name: Set Deployment Status - Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.result }},
+              state: 'failure',
+              environment_url: 'https://agents.ciris.ai',
+              description: 'Deployment failed'
+            });
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: \`${{ steps.metadata.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Strategy**: ${{ steps.metadata.outputs.strategy }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Risk Level**: ${{ steps.metadata.outputs.risk_level }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Changelog**: ${{ steps.metadata.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ steps.notify.outputs.success }}" == "true" ]]; then
+            echo "✅ Deployment initiated via CIRISManager" >> $GITHUB_STEP_SUMMARY
+            echo "**Deployment ID**: \`${{ steps.notify.outputs.deployment_id }}\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Direct deployment used (fallback)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment**: [Production](https://agents.ciris.ai)" >> $GITHUB_STEP_SUMMARY
+
+  smoke-test:
+    name: Smoke Tests
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests against production..."
+          
+          # Test main page loads
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://agents.ciris.ai)
+          if [[ "$response" == "200" ]]; then
+            echo "✅ Main page loads successfully"
+          else
+            echo "❌ Main page returned $response"
+            exit 1
+          fi
+          
+          # Test API health endpoint (if exposed)
+          api_response=$(curl -s -o /dev/null -w "%{http_code}" https://agents.ciris.ai/api/health || echo "404")
+          if [[ "$api_response" == "200" ]] || [[ "$api_response" == "404" ]]; then
+            echo "✅ API endpoint check passed"
+          else
+            echo "⚠️ API endpoint returned $api_response"
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Smoke Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Production deployment verified" >> $GITHUB_STEP_SUMMARY
