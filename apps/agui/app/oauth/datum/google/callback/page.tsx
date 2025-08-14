@@ -36,8 +36,8 @@ function GoogleOAuthCallbackContent() {
       localStorage.setItem('selectedAgentId', 'datum');
       localStorage.setItem('selectedAgentName', 'Datum');
 
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Redirect to main page
+      router.push('/');
     } else {
       // If no token, redirect to login with error
       router.push('/login?error=oauth_failed');

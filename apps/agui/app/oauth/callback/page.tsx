@@ -46,8 +46,8 @@ function OAuthCallbackContent() {
       // The handleOAuthCallback method already stores the token internally
       // No need to manually set token or localStorage as the SDK handles it
 
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Redirect to main page
+      router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'OAuth authentication failed');
       setProcessing(false);

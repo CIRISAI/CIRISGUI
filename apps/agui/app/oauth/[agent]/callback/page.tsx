@@ -80,14 +80,14 @@ function OAuthCallbackContent() {
         // Store the selected agent for future use
         localStorage.setItem('selectedAgentId', agentId);
 
-        console.log('[OAuth Callback] SDK configured, redirecting to dashboard');
+        console.log('[OAuth Callback] SDK configured, redirecting to main page');
 
-        // Redirect to dashboard or managed agent page based on mode
+        // Redirect to main page or managed agent page based on mode
         const { mode } = detectDeploymentMode();
         if (mode === 'managed') {
-          router.push(`/agent/${agentId}/dashboard`);
+          router.push(`/agent/${agentId}`);
         } else {
-          router.push('/dashboard');
+          router.push('/');
         }
         return;
       } catch (err) {
@@ -121,12 +121,12 @@ function OAuthCallbackContent() {
       // Store the selected agent for future use
       localStorage.setItem('selectedAgentId', agentId);
 
-      // Redirect to dashboard or managed agent page based on mode
+      // Redirect to main page or managed agent page based on mode
       const { mode } = detectDeploymentMode();
       if (mode === 'managed') {
-        router.push(`/agent/${agentId}/dashboard`);
+        router.push(`/agent/${agentId}`);
       } else {
-        router.push('/dashboard');
+        router.push('/');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'OAuth authentication failed');
