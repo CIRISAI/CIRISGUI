@@ -45,5 +45,6 @@ next-env.d.ts
 Thumbs.db
 
 # Logs
-logs/
+/logs/
 *.log
+!apps/agui/app/logs/
