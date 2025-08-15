@@ -143,11 +143,11 @@ export default function LoginPage() {
       // Determine OAuth URLs based on deployment mode
       if (agents.length > 1 || agent.container_name !== 'standalone') {
         // Managed mode: use agent-specific paths
-        redirectUri = encodeURIComponent(`${window.location.origin}/v1/auth/oauth/${selectedAgent}/${provider}/callback`);
+        redirectUri = encodeURIComponent(`${window.location.origin}/oauth/${selectedAgent}/${provider}/callback`);
         oauthUrl = `${window.location.origin}/api/${agent.agent_id}/v1/auth/oauth/${provider}/login`;
       } else {
-        // Standalone mode: direct OAuth
-        redirectUri = encodeURIComponent(`${window.location.origin}/oauth/callback`);
+        // Standalone mode: direct OAuth - still use dynamic route for consistency
+        redirectUri = encodeURIComponent(`${window.location.origin}/oauth/${selectedAgent}/${provider}/callback`);
         oauthUrl = `${window.location.origin}/v1/auth/oauth/${provider}/login`;
       }
 
