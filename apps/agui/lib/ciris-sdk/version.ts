@@ -2,7 +2,7 @@
 // This file is auto-updated during build
 
 export const SDK_VERSION = {
-  version: process.env.NEXT_PUBLIC_APP_VERSION || '1.5.1',
+  version: process.env.NEXT_PUBLIC_APP_VERSION!,
   buildDate: new Date().toISOString(),
   gitHash: process.env.NEXT_PUBLIC_GIT_HASH || 'development',
   gitBranch: process.env.NEXT_PUBLIC_GIT_BRANCH || 'main',
