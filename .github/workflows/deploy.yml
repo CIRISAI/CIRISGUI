@@ -1,7 +1,10 @@
 name: Deploy to Production
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Build and Test"]
+    types:
+      - completed
     branches:
       - main
   workflow_dispatch:
@@ -25,7 +28,7 @@ jobs:
   deploy:
     name: Deploy GUI
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
     environment: production
     steps:
       - uses: actions/checkout@v4
