@@ -10,14 +10,11 @@ import LogoIcon from "../../components/ui/floating/LogoIcon";
 import CButton from "components/ui/Buttons";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [selectedAgent, setSelectedAgent] = useState("datum");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(true);
-  const { login } = useAuth();
 
   // Always show Google and Discord OAuth options
   const oauthProviders = [
@@ -179,17 +176,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await login(username, password);
-    } catch (error) {
-      // Error is handled in AuthContext
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleManagerGoogleLogin = async () => {
     try {
@@ -220,8 +206,7 @@ export default function LoginPage() {
             </div>
           )}
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <input type="hidden" name="remember" value="true" />
+        <div className="mt-8 space-y-6">
 
           {/* Agent Selector */}
           <div>
@@ -253,51 +238,30 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="username" className="sr-only">
-                Username
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                autoComplete="username"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                disabled={loading}
-              />
+          {/* Login Instructions */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">
+                  Authentication Required
+                </h3>
+                <div className="mt-2 text-sm text-blue-700">
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>
+                      <strong>Log in with a Google account</strong> to observe the production agents
+                    </li>
+                    <li>
+                      <strong>Log in with a @ciris.ai email address</strong> to access the admin or manager interfaces
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center mt-6">
-            <button
-              type="submit"
-              disabled={loading || agents.length === 0}
-              className="focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed bg-brand-primary transition-all hover:bg-black cursor-pointer text-white border px-12 py-4 rounded-sm"
-            >
-              {loading ? "Signing in..." : agents.length === 0 ? "No agents available" : "Sign in"}
-            </button>
           </div>
 
           {/* OAuth Login Options */}
@@ -308,7 +272,7 @@ export default function LoginPage() {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-gray-50 text-gray-500">
-                  Or continue with
+                  Sign in with
                 </span>
               </div>
             </div>
@@ -369,7 +333,7 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-        </form>
+        </div>
 
         {/* Version indicator for debugging */}
         <div className="mt-4 text-center text-xs text-gray-400">
