@@ -23,6 +23,7 @@ export { SystemResource } from './resources/system';
 export { MemoryResource } from './resources/memory';
 export { ConfigResource, unwrapConfigValue, wrapConfigValue } from './resources/config';
 export { UsersResource } from './resources/users';
+export { ConsentResource } from './resources/consent';
 export * from './resources/manager';
 
 // Export OAuth types
@@ -47,3 +48,19 @@ export type {
   PermissionRequestResponse,
   PermissionGrantRequest
 } from './resources/users';
+
+// Export consent types
+export {
+  ConsentStream,
+  ConsentCategory,
+  type ConsentStatus,
+  type ConsentRequest,
+  type ConsentAuditEntry,
+  type ConsentDecayStatus,
+  type ConsentImpactReport,
+  type ConsentStreamInfo,
+  type ConsentCategoryInfo,
+  type PartnershipStatus,
+  type ConsentStreamsResponse,
+  type ConsentCategoriesResponse
+} from './resources/consent';

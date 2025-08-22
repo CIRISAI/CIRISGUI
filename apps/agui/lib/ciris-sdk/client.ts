@@ -12,6 +12,7 @@ import { WiseAuthorityResource } from './resources/wise-authority';
 import { EmergencyResource } from './resources/emergency';
 import { UsersResource } from './resources/users';
 import { ManagerResource } from './resources/manager';
+import { ConsentResource } from './resources/consent';
 import { User } from './types';
 import { SDK_VERSION } from './version';
 
@@ -38,6 +39,7 @@ export class CIRISClient {
   public readonly emergency: EmergencyResource;
   public readonly users: UsersResource;
   public readonly manager: ManagerResource;
+  public readonly consent: ConsentResource;
 
   constructor(options: CIRISClientOptions = {}) {
     // Use environment variable if available, otherwise fall back to window location for browser
@@ -72,6 +74,7 @@ export class CIRISClient {
     this.emergency = new EmergencyResource(this.transport);
     this.users = new UsersResource(this.transport);
     this.manager = new ManagerResource(this.transport);
+    this.consent = new ConsentResource(this.transport);
   }
 
   /**
