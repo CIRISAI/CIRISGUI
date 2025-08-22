@@ -3,7 +3,7 @@
  * Implements Consensual Evolution Protocol v0.2
  */
 
-import { BaseResource } from '../base';
+import { BaseResource } from './base';
 
 // Consent stream types
 export enum ConsentStream {
@@ -144,9 +144,7 @@ export class ConsentResource extends BaseResource {
    * @throws {Error} If not authenticated
    */
   async getStatus(): Promise<ConsentStatus> {
-    return this.request<ConsentStatus>('/v1/consent/status', {
-      method: 'GET',
-    });
+    return this.transport.get<ConsentStatus>('/v1/consent/status');
   }
 
   /**
@@ -162,10 +160,7 @@ export class ConsentResource extends BaseResource {
    * @throws {Error} If validation fails or not authenticated
    */
   async grantConsent(request: ConsentRequest): Promise<ConsentStatus> {
-    return this.request<ConsentStatus>('/v1/consent/grant', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+    return this.transport.post<ConsentStatus>('/v1/consent/grant', request);
   }
 
   /**
@@ -180,10 +175,7 @@ export class ConsentResource extends BaseResource {
    * @throws {Error} If no consent exists
    */
   async revokeConsent(reason?: string): Promise<ConsentDecayStatus> {
-    return this.request<ConsentDecayStatus>('/v1/consent/revoke', {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    });
+    return this.transport.post<ConsentDecayStatus>('/v1/consent/revoke', { reason });
   }
 
   /**
@@ -201,9 +193,7 @@ export class ConsentResource extends BaseResource {
    * @throws {Error} If no consent data found
    */
   async getImpactReport(): Promise<ConsentImpactReport> {
-    return this.request<ConsentImpactReport>('/v1/consent/impact', {
-      method: 'GET',
-    });
+    return this.transport.get<ConsentImpactReport>('/v1/consent/impact');
   }
 
   /**
@@ -213,9 +203,7 @@ export class ConsentResource extends BaseResource {
    * @returns List of audit entries
    */
   async getAuditTrail(limit: number = 100): Promise<ConsentAuditEntry[]> {
-    return this.request<ConsentAuditEntry[]>(`/v1/consent/audit?limit=${limit}`, {
-      method: 'GET',
-    });
+    return this.transport.get<ConsentAuditEntry[]>(`/v1/consent/audit?limit=${limit}`);
   }
 
   /**
@@ -224,9 +212,7 @@ export class ConsentResource extends BaseResource {
    * @returns Stream information and default stream
    */
   async getStreams(): Promise<ConsentStreamsResponse> {
-    return this.request<ConsentStreamsResponse>('/v1/consent/streams', {
-      method: 'GET',
-    });
+    return this.transport.get<ConsentStreamsResponse>('/v1/consent/streams');
   }
 
   /**
@@ -235,9 +221,7 @@ export class ConsentResource extends BaseResource {
    * @returns Category information
    */
   async getCategories(): Promise<ConsentCategoriesResponse> {
-    return this.request<ConsentCategoriesResponse>('/v1/consent/categories', {
-      method: 'GET',
-    });
+    return this.transport.get<ConsentCategoriesResponse>('/v1/consent/categories');
   }
 
   /**
@@ -249,9 +233,7 @@ export class ConsentResource extends BaseResource {
    * @returns Partnership status information
    */
   async getPartnershipStatus(): Promise<PartnershipStatus> {
-    return this.request<PartnershipStatus>('/v1/consent/partnership/status', {
-      method: 'GET',
-    });
+    return this.transport.get<PartnershipStatus>('/v1/consent/partnership/status');
   }
 
   /**
@@ -263,9 +245,7 @@ export class ConsentResource extends BaseResource {
    * @throws {Error} If not admin
    */
   async cleanupExpired(): Promise<{ cleaned: number; message: string }> {
-    return this.request<{ cleaned: number; message: string }>('/v1/consent/cleanup', {
-      method: 'POST',
-    });
+    return this.transport.post<{ cleaned: number; message: string }>('/v1/consent/cleanup', {});
   }
 
   /**

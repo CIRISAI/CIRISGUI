@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { cirisClient } from "../../lib/ciris-sdk";
-import ProtectedRoute from "../../components/ProtectedRoute";
+import { ProtectedRoute } from "../../components/ProtectedRoute";
 import PartnershipModal from "../../components/consent/PartnershipModal";
 
 // Import consent types
