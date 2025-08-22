@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { cirisClient } from "../../lib/ciris-sdk";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 import PartnershipModal from "../../components/consent/PartnershipModal";
+import { ConsentNotes, PendingPartnershipBanner } from "../../components/consent/ConsentNotes";
 
 // Import consent types
 interface ConsentStatus {
@@ -37,23 +38,53 @@ export default function ConsentPage() {
   const [partnershipPending, setPartnershipPending] = useState(false);
   const [showPartnershipModal, setShowPartnershipModal] = useState(false);
   const [partnershipStatus, setPartnershipStatus] = useState<string>("none");
+  const [hasConsent, setHasConsent] = useState(true);
+  const [agentPartnershipRequests, setAgentPartnershipRequests] = useState<any[]>([]);
 
   // Fetch current consent status
   useEffect(() => {
     const fetchConsentData = async () => {
       try {
-        // Get current status
-        const statusResponse = await cirisClient.consent.getStatus();
-        setConsentStatus(statusResponse);
+        // Get current status - handle new API format
+        const statusResponse = await cirisClient.makeRequest("/v1/consent/status", {
+          method: "GET",
+        });
+        
+        if (statusResponse.has_consent === false) {
+          setHasConsent(false);
+          setConsentStatus(null);
+        } else {
+          setHasConsent(true);
+          // Map the response to expected format
+          setConsentStatus({
+            user_id: statusResponse.user_id,
+            stream: statusResponse.stream || "temporary",
+            categories: [],
+            granted_at: statusResponse.granted_at,
+            expires_at: statusResponse.expires_at,
+            last_modified: statusResponse.granted_at,
+            impact_score: 0,
+            attribution_count: 0,
+          });
+        }
 
         // Get available streams
         const streamsResponse = await cirisClient.consent.getStreams();
         setStreams(streamsResponse.streams);
 
-        // Check for pending partnership
+        // Check for pending partnership - including agent requests
         const partnershipResponse = await cirisClient.consent.getPartnershipStatus();
         setPartnershipStatus(partnershipResponse.partnership_status);
         setPartnershipPending(partnershipResponse.partnership_status === "pending");
+        
+        // Check if agent has requested partnership
+        if (partnershipResponse.partnership_status === "agent_requested") {
+          setAgentPartnershipRequests([{
+            from: 'agent',
+            timestamp: new Date().toISOString(),
+            message: partnershipResponse.message
+          }]);
+        }
       } catch (error) {
         console.error("Failed to fetch consent data:", error);
       } finally {
@@ -104,16 +135,22 @@ export default function ConsentPage() {
       // Show partnership modal for PARTNERED stream
       setShowPartnershipModal(true);
     } else {
-      // Direct stream change for TEMPORARY or ANONYMOUS
+      // Direct stream change for TEMPORARY or ANONYMOUS (creates proactive opt-out)
       try {
+        const confirmMessage = streamKey === "anonymous" 
+          ? "Switching to ANONYMOUS will create a proactive opt-out and anonymize your data. Continue?"
+          : "Switching to TEMPORARY will create a proactive opt-out with 14-day auto-forget. Continue?";
+        
+        if (!confirm(confirmMessage)) return;
+        
         const response = await cirisClient.consent.grantConsent({
           stream: streamKey as any,
           categories: [],
-          reason: `User switched to ${streamKey} consent`,
+          reason: `User proactively opted for ${streamKey} consent (opt-out)`,
         });
         
         setConsentStatus(response);
-        alert(`Successfully switched to ${streamKey.toUpperCase()} consent mode.`);
+        alert(`Successfully switched to ${streamKey.toUpperCase()} consent mode. This creates a proactive opt-out.`);
       } catch (error) {
         console.error("Failed to change consent stream:", error);
         alert("Failed to change consent stream. Please try again.");
@@ -227,6 +264,27 @@ export default function ConsentPage() {
 
         {/* Main content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* No consent notice */}
+          {!hasConsent && (
+            <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+              <h3 className="text-lg font-medium text-yellow-900 mb-2">
+                Consent Record Not Yet Created
+              </h3>
+              <p className="text-yellow-700">
+                Your consent record will be automatically created 6-12 hours after your first Discord interaction with CIRIS. 
+                This ensures meaningful engagement before establishing a consent relationship.
+              </p>
+            </div>
+          )}
+
+          {/* Pending partnership from agent */}
+          <PendingPartnershipBanner partnershipRequests={agentPartnershipRequests} />
+
+          {/* Consent notes */}
+          <div className="mb-8">
+            <ConsentNotes />
+          </div>
+
           {/* Stream selection cards */}
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Choose Your Consent Stream</h2>
@@ -250,6 +308,14 @@ export default function ConsentPage() {
 
           {/* Audit trail */}
           <AuditTrail />
+
+          {/* Privacy notice */}
+          <div className="mt-8 text-center text-xs text-gray-500">
+            <p>
+              You can only view and manage your own consent settings. 
+              {user?.role === 'ADMIN' && ' As an admin, you can view (but not modify) consent records for compliance purposes.'}
+            </p>
+          </div>
         </div>
       </div>
 
