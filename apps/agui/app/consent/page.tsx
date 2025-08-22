@@ -46,26 +46,18 @@ export default function ConsentPage() {
     const fetchConsentData = async () => {
       try {
         // Get current status - handle new API format
-        const statusResponse = await cirisClient.makeRequest("/v1/consent/status", {
-          method: "GET",
-        });
-        
-        if (statusResponse.has_consent === false) {
-          setHasConsent(false);
-          setConsentStatus(null);
-        } else {
+        try {
+          const statusResponse = await cirisClient.consent.getStatus();
           setHasConsent(true);
-          // Map the response to expected format
-          setConsentStatus({
-            user_id: statusResponse.user_id,
-            stream: statusResponse.stream || "temporary",
-            categories: [],
-            granted_at: statusResponse.granted_at,
-            expires_at: statusResponse.expires_at,
-            last_modified: statusResponse.granted_at,
-            impact_score: 0,
-            attribution_count: 0,
-          });
+          setConsentStatus(statusResponse);
+        } catch (error: any) {
+          // If 404 or no consent exists
+          if (error?.response?.status === 404 || error?.message?.includes('not found')) {
+            setHasConsent(false);
+            setConsentStatus(null);
+          } else {
+            throw error;
+          }
         }
 
         // Get available streams
@@ -77,12 +69,12 @@ export default function ConsentPage() {
         setPartnershipStatus(partnershipResponse.partnership_status);
         setPartnershipPending(partnershipResponse.partnership_status === "pending");
         
-        // Check if agent has requested partnership
-        if (partnershipResponse.partnership_status === "agent_requested") {
+        // Check if agent has requested partnership (deferred status means agent wants to discuss)
+        if (partnershipResponse.partnership_status === "deferred") {
           setAgentPartnershipRequests([{
             from: 'agent',
             timestamp: new Date().toISOString(),
-            message: partnershipResponse.message
+            message: partnershipResponse.message || "The agent would like to establish a partnership with you."
           }]);
         }
       } catch (error) {
