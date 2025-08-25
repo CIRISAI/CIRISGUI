@@ -35,6 +35,7 @@ export interface ConsentStatus {
 
 // Consent grant request
 export interface ConsentRequest {
+  user_id: string;  // Required - must be the authenticated user's ID
   stream: ConsentStream;
   categories: ConsentCategory[];
   reason?: string;
@@ -159,8 +160,17 @@ export class ConsentResource extends BaseResource {
    * @returns Updated consent status
    * @throws {Error} If validation fails or not authenticated
    */
-  async grantConsent(request: ConsentRequest): Promise<ConsentStatus> {
-    return this.transport.post<ConsentStatus>('/v1/consent/grant', request);
+  async grantConsent(request: Omit<ConsentRequest, 'user_id'>): Promise<ConsentStatus> {
+    // Get the current user to include their ID
+    const currentUser = await this.transport.get<any>('/v1/auth/me');
+    
+    // Add the user_id to the request
+    const fullRequest: ConsentRequest = {
+      ...request,
+      user_id: currentUser.user_id
+    };
+    
+    return this.transport.post<ConsentStatus>('/v1/consent/grant', fullRequest);
   }
 
   /**
