@@ -225,13 +225,24 @@ export class Transport {
 
       // Handle enhanced 403 permission denied errors
       if (response.status === 403 && 'error' in data && data.error === 'insufficient_permissions') {
-        throw new CIRISPermissionDeniedError(
+        console.log('[CIRIS SDK] Creating PermissionDeniedError with Discord invite:', {
+          message: data.message || errorData.detail || 'Permission denied',
+          discordInvite: data.discord_invite,
+          canRequestPermissions: data.can_request_permissions,
+          permissionRequested: data.permission_requested,
+          requestedAt: data.requested_at
+        });
+        
+        const permError = new CIRISPermissionDeniedError(
           data.message || errorData.detail || 'Permission denied',
           data.discord_invite,
           data.can_request_permissions,
           data.permission_requested,
           data.requested_at
         );
+        
+        console.log('[CIRIS SDK] Throwing PermissionDeniedError:', permError);
+        throw permError;
       }
 
       throw new CIRISAPIError(

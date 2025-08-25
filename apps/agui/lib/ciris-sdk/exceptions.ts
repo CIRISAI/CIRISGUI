@@ -59,14 +59,23 @@ export class CIRISRateLimitError extends CIRISAPIError {
 }
 
 export class CIRISPermissionDeniedError extends CIRISAPIError {
+  public discordInvite?: string;
+  public canRequestPermissions?: boolean;
+  public permissionRequested?: boolean;
+  public requestedAt?: string;
+  
   constructor(
     message: string,
-    public discordInvite?: string,
-    public canRequestPermissions?: boolean,
-    public permissionRequested?: boolean,
-    public requestedAt?: string
+    discordInvite?: string,
+    canRequestPermissions?: boolean,
+    permissionRequested?: boolean,
+    requestedAt?: string
   ) {
     super(403, message);
     this.name = 'CIRISPermissionDeniedError';
+    this.discordInvite = discordInvite;
+    this.canRequestPermissions = canRequestPermissions;
+    this.permissionRequested = permissionRequested;
+    this.requestedAt = requestedAt;
   }
 }

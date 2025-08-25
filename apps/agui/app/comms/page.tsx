@@ -62,7 +62,30 @@ export default function CommsPage() {
     },
     onError: (error: any) => {
       console.error('Send message error:', error);
-      toast.error(error.message || 'Failed to send message');
+      
+      // Check if it's a permission denied error with Discord invite
+      if (error.discordInvite) {
+        // Create a custom toast with Discord link
+        toast.error(
+          <div>
+            <p className="font-semibold mb-2">{error.message || 'Permission Denied'}</p>
+            <p className="text-sm mb-2">Join our Discord to get access:</p>
+            <a 
+              href={error.discordInvite} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-block px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+            >
+              Join Discord
+            </a>
+          </div>,
+          { duration: 10000 }
+        );
+      } else {
+        // Regular error message
+        const errorMessage = error.detail || error.message || 'Failed to send message';
+        toast.error(errorMessage);
+      }
     },
   });
 
@@ -79,7 +102,8 @@ export default function CommsPage() {
     },
     onError: (error: any) => {
       console.error('Shutdown error:', error);
-      toast.error(error.message || 'Failed to initiate shutdown');
+      const errorMessage = error.detail || error.message || 'Failed to initiate shutdown';
+      toast.error(errorMessage);
     },
   });
 
@@ -100,7 +124,8 @@ export default function CommsPage() {
     },
     onError: (error: any) => {
       console.error('Emergency shutdown error:', error);
-      toast.error(error.message || 'Failed to initiate emergency shutdown');
+      const errorMessage = error.detail || error.message || 'Failed to initiate emergency shutdown';
+      toast.error(errorMessage);
     },
   });
 
