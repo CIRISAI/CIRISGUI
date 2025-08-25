@@ -66,6 +66,10 @@ export default function PartnershipModal({ isOpen, onClose, onSuccess }: Partner
     setError(null);
 
     try {
+      // Debug logging
+      console.log("Selected categories (raw):", selectedCategories);
+      console.log("Selected categories (values):", selectedCategories.map(c => String(c)));
+      
       await cirisClient.consent.requestPartnership(
         selectedCategories,
         reason || "User requested partnership upgrade"
@@ -73,9 +77,17 @@ export default function PartnershipModal({ isOpen, onClose, onSuccess }: Partner
 
       onSuccess();
       onClose();
-    } catch (err) {
-      setError("Failed to submit partnership request. Please try again.");
+    } catch (err: any) {
+      // Better error handling
+      const errorMessage = err?.detail || err?.message || "Failed to submit partnership request. Please try again.";
+      setError(errorMessage);
       console.error("Partnership request failed:", err);
+      console.error("Error details:", {
+        status: err?.status,
+        detail: err?.detail,
+        message: err?.message,
+        type: err?.type
+      });
     } finally {
       setLoading(false);
     }

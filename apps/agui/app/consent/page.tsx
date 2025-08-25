@@ -6,6 +6,7 @@ import { cirisClient } from "../../lib/ciris-sdk";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 import PartnershipModal from "../../components/consent/PartnershipModal";
 import { ConsentNotes, PendingPartnershipBanner } from "../../components/consent/ConsentNotes";
+import { ConsentErrorBoundary } from "../../components/consent/ConsentErrorBoundary";
 
 // Import consent types
 interface ConsentStatus {
@@ -29,7 +30,7 @@ interface ConsentStream {
   requires_categories?: boolean;
 }
 
-export default function ConsentPage() {
+function ConsentPageContent() {
   const { user } = useAuth();
   const [consentStatus, setConsentStatus] = useState<ConsentStatus | null>(null);
   const [streams, setStreams] = useState<Record<string, ConsentStream>>({});
@@ -77,8 +78,11 @@ export default function ConsentPage() {
             message: partnershipResponse.message || "The agent would like to establish a partnership with you."
           }]);
         }
-      } catch (error) {
-        console.error("Failed to fetch consent data:", error);
+      } catch (error: any) {
+        console.error("❌ Failed to fetch consent data:", error);
+        alert(`Failed to load consent data: ${error?.detail || error?.message || 'Unknown error'}`);
+        // Re-throw to make it fail fast and loud
+        throw error;
       } finally {
         setLoading(false);
       }
@@ -111,8 +115,11 @@ export default function ConsentPage() {
             alert("Partnership request was declined by the agent.");
           }
         }
-      } catch (error) {
-        console.error("Failed to poll partnership status:", error);
+      } catch (error: any) {
+        console.error("❌ Failed to poll partnership status:", error);
+        alert(`Failed to check partnership status: ${error?.detail || error?.message || 'Unknown error'}`);
+        setPartnershipPending(false); // Stop polling on error
+        clearInterval(pollInterval);
       }
     }, 5000); // Poll every 5 seconds
 
@@ -143,9 +150,18 @@ export default function ConsentPage() {
         
         setConsentStatus(response);
         alert(`Successfully switched to ${streamKey.toUpperCase()} consent mode. This creates a proactive opt-out.`);
-      } catch (error) {
-        console.error("Failed to change consent stream:", error);
-        alert("Failed to change consent stream. Please try again.");
+      } catch (error: any) {
+        console.error("❌ Failed to change consent stream:", error);
+        const errorDetail = error?.detail || error?.message || 'Unknown error';
+        alert(`Failed to change consent stream: ${errorDetail}`);
+        // Log full error for debugging
+        console.error("Full error object:", {
+          status: error?.status,
+          detail: error?.detail,
+          message: error?.message,
+          type: error?.type,
+          stack: error?.stack
+        });
       }
     }
   }, [consentStatus]);
@@ -403,8 +419,14 @@ function ImpactDashboard({ consentStatus }: { consentStatus: ConsentStatus }) {
       try {
         const response = await cirisClient.consent.getImpactReport();
         setImpact(response);
-      } catch (error) {
-        console.error("Failed to fetch impact data:", error);
+      } catch (error: any) {
+        console.error("❌ Failed to fetch impact data:", error);
+        console.error("Impact error details:", {
+          status: error?.status,
+          detail: error?.detail,
+          message: error?.message
+        });
+        // Don't throw here as impact is optional, but log prominently
       } finally {
         setLoading(false);
       }
@@ -451,8 +473,14 @@ function AuditTrail() {
       try {
         const response = await cirisClient.consent.getAuditTrail(10);
         setAuditEntries(response);
-      } catch (error) {
-        console.error("Failed to fetch audit trail:", error);
+      } catch (error: any) {
+        console.error("❌ Failed to fetch audit trail:", error);
+        console.error("Audit error details:", {
+          status: error?.status,
+          detail: error?.detail,
+          message: error?.message
+        });
+        // Don't throw here as audit is optional, but log prominently
       } finally {
         setLoading(false);
       }
@@ -502,5 +530,14 @@ function AuditTrail() {
         </div>
       )}
     </div>
+  );
+}
+
+// Export the page wrapped in error boundary
+export default function ConsentPage() {
+  return (
+    <ConsentErrorBoundary>
+      <ConsentPageContent />
+    </ConsentErrorBoundary>
   );
 }

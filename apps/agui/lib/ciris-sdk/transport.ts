@@ -78,6 +78,16 @@ export class Transport {
 
         if (options.body && method !== 'GET') {
           requestInit.body = JSON.stringify(options.body);
+          
+          // Log consent requests for debugging
+          if (path.includes('/consent/grant')) {
+            console.log('[CIRIS SDK] Consent request payload:', {
+              url: url,
+              method: method,
+              body: options.body,
+              stringified: JSON.stringify(options.body)
+            });
+          }
         }
 
         // Make request
@@ -201,6 +211,17 @@ export class Transport {
     // Handle errors
     if (!response.ok) {
       const errorData = data as ErrorResponse;
+
+      // Log detailed error information for debugging
+      if (response.status === 422) {
+        console.error('[CIRIS SDK] 422 Validation Error:', {
+          url: response.url,
+          status: response.status,
+          errorData: data,
+          detail: errorData.detail,
+          rawData: JSON.stringify(data)
+        });
+      }
 
       // Handle enhanced 403 permission denied errors
       if (response.status === 403 && 'error' in data && data.error === 'insufficient_permissions') {
