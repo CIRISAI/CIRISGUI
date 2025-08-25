@@ -7,6 +7,7 @@ import { ProtectedRoute } from "../../components/ProtectedRoute";
 import PartnershipModal from "../../components/consent/PartnershipModal";
 import { ConsentNotes, PendingPartnershipBanner } from "../../components/consent/ConsentNotes";
 import { ConsentErrorBoundary } from "../../components/consent/ConsentErrorBoundary";
+import { extractErrorMessage } from "../../lib/utils/error-helpers";
 
 // Import consent types
 interface ConsentStatus {
@@ -80,7 +81,8 @@ function ConsentPageContent() {
         }
       } catch (error: any) {
         console.error("❌ Failed to fetch consent data:", error);
-        alert(`Failed to load consent data: ${error?.detail || error?.message || 'Unknown error'}`);
+        const errorMessage = extractErrorMessage(error);
+        alert(`Failed to load consent data: ${errorMessage}`);
         // Re-throw to make it fail fast and loud
         throw error;
       } finally {
@@ -117,7 +119,8 @@ function ConsentPageContent() {
         }
       } catch (error: any) {
         console.error("❌ Failed to poll partnership status:", error);
-        alert(`Failed to check partnership status: ${error?.detail || error?.message || 'Unknown error'}`);
+        const errorMessage = extractErrorMessage(error);
+        alert(`Failed to check partnership status: ${errorMessage}`);
         setPartnershipPending(false); // Stop polling on error
         clearInterval(pollInterval);
       }
@@ -152,8 +155,8 @@ function ConsentPageContent() {
         alert(`Successfully switched to ${streamKey.toUpperCase()} consent mode. This creates a proactive opt-out.`);
       } catch (error: any) {
         console.error("❌ Failed to change consent stream:", error);
-        const errorDetail = error?.detail || error?.message || 'Unknown error';
-        alert(`Failed to change consent stream: ${errorDetail}`);
+        const errorMessage = extractErrorMessage(error);
+        alert(`Failed to change consent stream: ${errorMessage}`);
         // Log full error for debugging
         console.error("Full error object:", {
           status: error?.status,

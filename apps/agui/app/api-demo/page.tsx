@@ -580,17 +580,21 @@ export default function ApiDemoPage() {
 
       toast.success(`${demo.title} completed in ${duration}ms`);
     } catch (error: any) {
+      // Import the helper at the top of the file
+      const { extractErrorMessage, getDiscordInvite } = await import('../../lib/utils/error-helpers');
+      
       // Extract proper error message
-      const errorMessage = error.detail || error.message || 'Unknown error';
+      const errorMessage = extractErrorMessage(error);
       
       // Check for permission denied with Discord invite
-      if (error.discordInvite) {
+      const discordInvite = getDiscordInvite(error);
+      if (discordInvite) {
         toast.error(
           <div>
             <p className="font-semibold mb-2">{errorMessage}</p>
             <p className="text-sm mb-2">Join our Discord to get access:</p>
             <a 
-              href={error.discordInvite} 
+              href={discordInvite} 
               target="_blank" 
               rel="noopener noreferrer"
               className="inline-block px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"

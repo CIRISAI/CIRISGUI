@@ -8,6 +8,7 @@ import { StatusDot } from '../../components/Icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgent } from '../../contexts/AgentContextHybrid';
 import { NoAgentsPlaceholder } from '../../components/NoAgentsPlaceholder';
+import { extractErrorMessage, getDiscordInvite } from '../../lib/utils/error-helpers';
 
 export default function CommsPage() {
   const { user } = useAuth();
@@ -64,14 +65,16 @@ export default function CommsPage() {
       console.error('Send message error:', error);
       
       // Check if it's a permission denied error with Discord invite
-      if (error.discordInvite) {
+      const discordInvite = getDiscordInvite(error);
+      if (discordInvite) {
         // Create a custom toast with Discord link
+        const errorMessage = extractErrorMessage(error);
         toast.error(
           <div>
-            <p className="font-semibold mb-2">{error.message || 'Permission Denied'}</p>
+            <p className="font-semibold mb-2">{errorMessage}</p>
             <p className="text-sm mb-2">Join our Discord to get access:</p>
             <a 
-              href={error.discordInvite} 
+              href={discordInvite} 
               target="_blank" 
               rel="noopener noreferrer"
               className="inline-block px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
@@ -83,7 +86,7 @@ export default function CommsPage() {
         );
       } else {
         // Regular error message
-        const errorMessage = error.detail || error.message || 'Failed to send message';
+        const errorMessage = extractErrorMessage(error);
         toast.error(errorMessage);
       }
     },
@@ -102,7 +105,7 @@ export default function CommsPage() {
     },
     onError: (error: any) => {
       console.error('Shutdown error:', error);
-      const errorMessage = error.detail || error.message || 'Failed to initiate shutdown';
+      const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage);
     },
   });
@@ -124,7 +127,7 @@ export default function CommsPage() {
     },
     onError: (error: any) => {
       console.error('Emergency shutdown error:', error);
-      const errorMessage = error.detail || error.message || 'Failed to initiate emergency shutdown';
+      const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage);
     },
   });

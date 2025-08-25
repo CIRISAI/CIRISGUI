@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cirisClient, ConsentStream, ConsentCategory } from "../../lib/ciris-sdk";
+import { extractErrorMessage } from "../../lib/utils/error-helpers";
 
 interface PartnershipModalProps {
   isOpen: boolean;
@@ -78,8 +79,8 @@ export default function PartnershipModal({ isOpen, onClose, onSuccess }: Partner
       onSuccess();
       onClose();
     } catch (err: any) {
-      // Better error handling
-      const errorMessage = err?.detail || err?.message || "Failed to submit partnership request. Please try again.";
+      // Better error handling using helper
+      const errorMessage = extractErrorMessage(err);
       setError(errorMessage);
       console.error("Partnership request failed:", err);
       console.error("Error details:", {

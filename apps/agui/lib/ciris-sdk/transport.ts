@@ -222,6 +222,23 @@ export class Transport {
           rawData: JSON.stringify(data)
         });
       }
+      
+      // Handle 422 validation errors with detail array
+      if (response.status === 422 && Array.isArray(errorData.detail)) {
+        // FastAPI/Pydantic validation errors come as an array of error objects
+        const validationErrors = errorData.detail.map((err: any) => {
+          // Each error has: loc (location), msg (message), type (error type), input (provided value)
+          const location = Array.isArray(err.loc) ? err.loc.join('.') : err.loc;
+          return `${location}: ${err.msg}`;
+        }).join('; ');
+        
+        throw new CIRISAPIError(
+          response.status,
+          validationErrors || 'Validation error',
+          validationErrors,
+          'validation_error'
+        );
+      }
 
       // Handle enhanced 403 permission denied errors
       if (response.status === 403 && 'error' in data && data.error === 'insufficient_permissions') {
