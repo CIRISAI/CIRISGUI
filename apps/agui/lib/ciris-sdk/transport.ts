@@ -188,23 +188,60 @@ export class Transport {
 
     // Parse JSON response for error handling or JSON responses
     let data: any;
+    let responseText: string = '';
     try {
-      const text = await response.text();
-      data = text ? JSON.parse(text) : {};
+      responseText = await response.text();
+      data = responseText ? JSON.parse(responseText) : {};
     } catch (error) {
-      // If it's a successful response but we can't parse JSON, and responseType wasn't specified
+      // Log the parsing error and response details
+      console.error('[CIRIS SDK] Failed to parse JSON response:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        responseText: responseText.substring(0, 500), // First 500 chars for debugging
+        error: error
+      });
+      
+      // If it's a successful response but we can't parse JSON
       if (response.ok) {
+        // Check if it might be HTML (common for error pages)
+        if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
+          throw new CIRISAPIError(
+            response.status,
+            'Received HTML instead of JSON. The API endpoint may be incorrect or the server may be returning an error page.',
+            responseText.substring(0, 200)
+          );
+        }
+        // Return empty object for 200 OK with no content
+        if (!responseText || responseText.trim() === '') {
+          return {} as any;
+        }
         throw new CIRISAPIError(
           response.status,
-          'Failed to parse response',
-          'Invalid JSON response'
+          'Failed to parse response as JSON',
+          responseText.substring(0, 200)
         );
       }
-      // For error responses, we always expect JSON
+      
+      // For error responses, provide more context
+      let errorMessage = `HTTP ${response.status} error`;
+      
+      // Try to extract meaningful error from HTML if present
+      if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
+        // Try to extract title or body text from HTML
+        const titleMatch = responseText.match(/<title>(.*?)<\/title>/i);
+        if (titleMatch) {
+          errorMessage = titleMatch[1];
+        }
+      } else if (responseText) {
+        // Use the raw text if it's not HTML
+        errorMessage = responseText.substring(0, 200);
+      }
+      
       throw new CIRISAPIError(
         response.status,
-        `HTTP ${response.status} error`,
-        'Response body was not valid JSON'
+        errorMessage,
+        'Response was not valid JSON. This might indicate the API is down, the endpoint is incorrect, or there is a server error.'
       );
     }
 

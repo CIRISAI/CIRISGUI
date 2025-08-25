@@ -42,10 +42,17 @@ export class CIRISClient {
   public readonly consent: ConsentResource;
 
   constructor(options: CIRISClientOptions = {}) {
-    // Use environment variable if available, otherwise fall back to window location for browser
-    const defaultBaseURL = typeof window !== 'undefined'
-      ? `${window.location.protocol}//${window.location.host}`
-      : process.env.NEXT_PUBLIC_CIRIS_API_URL || 'http://localhost:8080';
+    // Determine the default base URL based on environment
+    let defaultBaseURL: string;
+    
+    if (typeof window !== 'undefined') {
+      // In browser: check for environment variable first, then use relative path for API proxy
+      // The Next.js app proxies /api/* to the backend API
+      defaultBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
+    } else {
+      // Server-side: use environment variable or localhost
+      defaultBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+    }
 
     const transportOptions: TransportOptions = {
       baseURL: options.baseURL || defaultBaseURL,
@@ -187,8 +194,20 @@ export class CIRISClient {
   }
 }
 
-// Export a singleton instance for easy use
-export const cirisClient = new CIRISClient();
+// Create a singleton instance with proper defaults
+// This will be reconfigured by SDKConfigManager when agent is selected
+const createDefaultClient = () => {
+  // For browser environments, we need to ensure we're not hitting the Next.js server
+  const baseURL = typeof window !== 'undefined' 
+    ? (process.env.NEXT_PUBLIC_API_BASE_URL || '/api/default')
+    : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080');
+  
+  console.log('[CIRIS SDK] Creating default client with baseURL:', baseURL);
+  
+  return new CIRISClient({ baseURL });
+};
+
+export const cirisClient = createDefaultClient();
 
 // Export everything for advanced usage
 export * from './types';

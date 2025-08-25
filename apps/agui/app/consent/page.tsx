@@ -54,7 +54,12 @@ function ConsentPageContent() {
           setConsentStatus(statusResponse);
         } catch (error: any) {
           // If 404 or no consent exists
-          if (error?.response?.status === 404 || error?.message?.includes('not found')) {
+          console.log('[Consent] Error fetching status:', error);
+          if (error?.status === 404 || 
+              error?.response?.status === 404 || 
+              error?.message?.toLowerCase().includes('not found') ||
+              error?.message?.toLowerCase().includes('404')) {
+            console.log('[Consent] No consent record found (404), this is normal for new users');
             setHasConsent(false);
             setConsentStatus(null);
           } else {
