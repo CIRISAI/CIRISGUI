@@ -35,6 +35,7 @@ function Navbar({ className }: { className?: string }) {
     { name: "Tools", href: "/tools", minRole: "OBSERVER" },
     { name: "System", href: "/system", minRole: "OBSERVER" },
     { name: "Config", href: "/config", minRole: "ADMIN" },
+    { name: "Consent", href: "/consent", minRole: "ADMIN" },
     { name: "Users", href: "/users", minRole: "ADMIN" },
     { name: "WA", href: "/wa", minRole: "OBSERVER" }, // Will be filtered by the page itself based on ADMIN or AUTHORITY role
   ];
