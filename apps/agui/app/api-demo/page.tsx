@@ -6,6 +6,8 @@ import { cirisClient } from '../../lib/ciris-sdk';
 import { ProtectedRoute } from '../../components/ProtectedRoute';
 import toast from 'react-hot-toast';
 import { SpinnerIcon } from '../../components/Icons';
+import { ErrorModal } from '../../components/ErrorModal';
+import { extractErrorMessage } from '../../lib/utils/error-helpers';
 
 interface DemoSection {
   title: string;
@@ -21,6 +23,11 @@ export default function ApiDemoPage() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [activeCategory, setActiveCategory] = useState<keyof typeof demoCategories>('agent');
+  const [errorModal, setErrorModal] = useState<{ isOpen: boolean; message: string; details?: any }>({
+    isOpen: false,
+    message: '',
+    details: undefined
+  });
 
   const demoCategories: Record<string, { title: string; demos: DemoSection[] }> = {
     agent: {
@@ -580,33 +587,15 @@ export default function ApiDemoPage() {
 
       toast.success(`${demo.title} completed in ${duration}ms`);
     } catch (error: any) {
-      // Import the helper at the top of the file
-      const { extractErrorMessage, getDiscordInvite } = await import('../../lib/utils/error-helpers');
-      
       // Extract proper error message
       const errorMessage = extractErrorMessage(error);
       
-      // Check for permission denied with Discord invite
-      const discordInvite = getDiscordInvite(error);
-      if (discordInvite) {
-        toast.error(
-          <div>
-            <p className="font-semibold mb-2">{errorMessage}</p>
-            <p className="text-sm mb-2">Join our Discord to get access:</p>
-            <a 
-              href={discordInvite} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="inline-block px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
-            >
-              Join Discord
-            </a>
-          </div>,
-          { duration: 10000 }
-        );
-      } else {
-        toast.error(`${demo.title} failed: ${errorMessage}`);
-      }
+      // Show error modal
+      setErrorModal({
+        isOpen: true,
+        message: errorMessage,
+        details: error.response?.data || error.details
+      });
       
       const errorResult = {
         success: false,
@@ -778,6 +767,15 @@ export default function ApiDemoPage() {
           </div>
         </div>
       </div>
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal({ isOpen: false, message: '', details: undefined })}
+        title="API Error"
+        message={errorModal.message}
+        details={errorModal.details}
+      />
     </ProtectedRoute>
   );
 }

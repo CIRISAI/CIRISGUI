@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAgent } from '../../contexts/AgentContextHybrid';
 import { NoAgentsPlaceholder } from '../../components/NoAgentsPlaceholder';
 import { extractErrorMessage, getDiscordInvite } from '../../lib/utils/error-helpers';
+import { ErrorModal } from '../../components/ErrorModal';
 
 export default function CommsPage() {
   const { user } = useAuth();
@@ -18,6 +19,11 @@ export default function CommsPage() {
   const [showEmergencyShutdownDialog, setShowEmergencyShutdownDialog] = useState(false);
   const [shutdownReason, setShutdownReason] = useState('User requested graceful shutdown');
   const [emergencyReason, setEmergencyReason] = useState('EMERGENCY: Immediate shutdown required');
+  const [errorModal, setErrorModal] = useState<{ isOpen: boolean; message: string; details?: any }>({
+    isOpen: false,
+    message: '',
+    details: undefined
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -64,31 +70,15 @@ export default function CommsPage() {
     onError: (error: any) => {
       console.error('Send message error:', error);
       
-      // Check if it's a permission denied error with Discord invite
-      const discordInvite = getDiscordInvite(error);
-      if (discordInvite) {
-        // Create a custom toast with Discord link
-        const errorMessage = extractErrorMessage(error);
-        toast.error(
-          <div>
-            <p className="font-semibold mb-2">{errorMessage}</p>
-            <p className="text-sm mb-2">Join our Discord to get access:</p>
-            <a 
-              href={discordInvite} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="inline-block px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
-            >
-              Join Discord
-            </a>
-          </div>,
-          { duration: 10000 }
-        );
-      } else {
-        // Regular error message
-        const errorMessage = extractErrorMessage(error);
-        toast.error(errorMessage);
-      }
+      // Extract error message
+      const errorMessage = extractErrorMessage(error);
+      
+      // Show error modal instead of toast
+      setErrorModal({
+        isOpen: true,
+        message: errorMessage,
+        details: error.response?.data || error.details
+      });
     },
   });
 
@@ -393,6 +383,15 @@ export default function CommsPage() {
           </div>
         </div>
       )}
+      
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal({ isOpen: false, message: '', details: undefined })}
+        title="Communication Error"
+        message={errorModal.message}
+        details={errorModal.details}
+      />
     </div>
   );
 }
