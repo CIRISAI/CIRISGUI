@@ -13,7 +13,7 @@ import { AddUserModal } from '../../components/users/AddUserModal';
 import { ChevronRightIcon, KeyIcon, UserPlusIcon, ShieldCheckIcon } from '../../components/Icons';
 
 export default function UsersPage() {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +22,8 @@ export default function UsersPage() {
   const [waMintUser, setWAMintUser] = useState<UserDetail | null>(null);
   const [showOAuthConfig, setShowOAuthConfig] = useState(false);
   const [showAddUser, setShowAddUser] = useState(false);
+  const [showSelfMint, setShowSelfMint] = useState(false);
+  const [currentUserDetails, setCurrentUserDetails] = useState<UserDetail | null>(null);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -35,6 +37,21 @@ export default function UsersPage() {
   useEffect(() => {
     loadUsers();
   }, [page, searchTerm, filterRole, filterAuthType]);
+
+  // Load current user details to check WA status
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      if (user?.user_id) {
+        try {
+          const details = await cirisClient.users.get(user.user_id);
+          setCurrentUserDetails(details);
+        } catch (err) {
+          console.error('Failed to load current user details:', err);
+        }
+      }
+    };
+    loadCurrentUser();
+  }, [user]);
 
   const loadUsers = async () => {
     try {
@@ -55,6 +72,9 @@ export default function UsersPage() {
       setLoading(false);
     }
   };
+
+  // Check if there are any WAs in the system
+  const hasExistingWAs = users.some(u => u.wa_role !== null && u.wa_role !== undefined);
 
   const loadUserDetails = async (userId: string) => {
     try {
@@ -100,6 +120,22 @@ export default function UsersPage() {
             </p>
           </div>
           <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+            {/* Show self-mint button if current user is not a WA and either:
+                1. No WAs exist in the system (bootstrap scenario)
+                2. User is SYSTEM_ADMIN (can always self-mint) */}
+            {currentUserDetails && !currentUserDetails.wa_role && (!hasExistingWAs || hasRole('SYSTEM_ADMIN')) && (
+              <button
+                onClick={() => {
+                  setWAMintUser(currentUserDetails);
+                  setShowSelfMint(true);
+                }}
+                className="inline-flex items-center px-4 py-2 border border-purple-300 rounded-md shadow-sm text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100"
+                title={!hasExistingWAs ? "Bootstrap first Wise Authority" : "Mint yourself as Wise Authority"}
+              >
+                <ShieldCheckIcon size="md" className="-ml-1 mr-2 text-purple-600" />
+                {!hasExistingWAs ? 'Bootstrap First WA' : 'Self-Mint as WA'}
+              </button>
+            )}
             {hasRole('SYSTEM_ADMIN') && (
               <>
                 <button
@@ -373,15 +409,24 @@ export default function UsersPage() {
         />
       )}
 
-      {/* WA Mint Modal */}
+      {/* WA Mint Modal (also used for self-minting) */}
       {waMintUser && (
         <WAMintModal
           user={waMintUser}
-          onClose={() => setWAMintUser(null)}
+          onClose={() => {
+            setWAMintUser(null);
+            setShowSelfMint(false);
+          }}
           onSuccess={() => {
             setWAMintUser(null);
+            setShowSelfMint(false);
             loadUsers();
+            // Reload current user details if it was a self-mint
+            if (showSelfMint && user?.user_id) {
+              cirisClient.users.get(user.user_id).then(setCurrentUserDetails);
+            }
           }}
+          isSelfMint={showSelfMint}
         />
       )}
 

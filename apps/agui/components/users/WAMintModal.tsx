@@ -10,9 +10,10 @@ interface WAMintModalProps {
   user: UserDetail;
   onClose: () => void;
   onSuccess: () => void;
+  isSelfMint?: boolean;
 }
 
-export function WAMintModal({ user, onClose, onSuccess }: WAMintModalProps) {
+export function WAMintModal({ user, onClose, onSuccess, isSelfMint = false }: WAMintModalProps) {
   const [waRole, setWARole] = useState<WARole>('OBSERVER');
   const [rootKey, setRootKey] = useState('');
   const [privateKeyPath, setPrivateKeyPath] = useState('~/.ciris/wa_keys/root_wa.key');
@@ -115,7 +116,7 @@ export function WAMintModal({ user, onClose, onSuccess }: WAMintModalProps) {
                       <ShieldIcon size="md" className="text-purple-600" />
                     </div>
                     <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900">
-                      Mint as Wise Authority
+                      {isSelfMint ? 'Bootstrap Wise Authority' : 'Mint as Wise Authority'}
                     </Dialog.Title>
                   </div>
                   <button
@@ -131,7 +132,16 @@ export function WAMintModal({ user, onClose, onSuccess }: WAMintModalProps) {
                 <div className="flex-1 overflow-y-auto px-4 pt-5 pb-4 sm:p-6">
                   <div className="text-center mb-6">
                     <p className="text-sm text-gray-500">
-                      Grant Wise Authority status to <span className="font-medium">{user.username}</span>
+                      {isSelfMint 
+                        ? <>
+                            You are about to mint yourself (<span className="font-medium">{user.username}</span>) as the first Wise Authority.
+                            <br />
+                            <span className="text-xs text-amber-600 mt-2 block">
+                              This requires the root WA private key to sign the transaction.
+                            </span>
+                          </>
+                        : <>Grant Wise Authority status to <span className="font-medium">{user.username}</span></>
+                      }
                     </p>
                   </div>
 
