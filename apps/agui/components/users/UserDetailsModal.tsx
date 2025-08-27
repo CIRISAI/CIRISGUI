@@ -213,7 +213,7 @@ export function UserDetailsModal({ user, onClose, onPasswordChange, onMintWA, on
                               ) : (
                                 <span className="text-sm text-gray-500">Not a Wise Authority</span>
                               )}
-                              {hasRole('SYSTEM_ADMIN') && !user.wa_role && (
+                              {(hasRole('SYSTEM_ADMIN') || hasRole('AUTHORITY')) && !user.wa_role && (
                                 <button
                                   onClick={onMintWA}
                                   className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200"
