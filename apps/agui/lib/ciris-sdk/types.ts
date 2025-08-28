@@ -3,7 +3,7 @@
 
 // Role Types
 export type APIRole = 'OBSERVER' | 'ADMIN' | 'AUTHORITY' | 'SYSTEM_ADMIN';
-export type WARole = 'OBSERVER' | 'ADMIN' | 'AUTHORITY';
+export type WARole = 'observer' | 'admin' | 'authority' | 'root';
 
 // Base Types
 export interface User {
