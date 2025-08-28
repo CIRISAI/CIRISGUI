@@ -57,7 +57,7 @@ export default function WAPage() {
   });
 
   // Check if user can resolve deferrals (must be a minted WA)
-  const canResolve = userDetail?.wa_role === 'AUTHORITY' || userDetail?.wa_role === 'ADMIN';
+  const canResolve = userDetail?.wa_role === 'authority' || userDetail?.wa_role === 'admin';
 
   // Resolve deferral mutation
   const resolveMutation = useMutation({

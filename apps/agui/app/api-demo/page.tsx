@@ -500,12 +500,12 @@ export default function ApiDemoPage() {
           endpoint: 'POST /v1/users/{userId}/mint-wa',
           method: 'POST' as const,
           execute: () => cirisClient.users.mintWiseAuthority('demo_user', {
-            wa_role: 'AUTHORITY',
+            wa_role: 'authority',
             signature: 'ed25519_signature_here'
           }),
           params: {
             userId: 'demo_user',
-            wa_role: 'AUTHORITY',
+            wa_role: 'authority',
             signature: 'ed25519_signature_here'
           }
         }

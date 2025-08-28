@@ -111,7 +111,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
           agentId: currentAgent.agent_id,
           apiRole: userInfo.api_role,
           waRole: userInfo.wa_role,
-          isAuthority: userInfo.wa_role === 'AUTHORITY' || userInfo.api_role === 'SYSTEM_ADMIN',
+          isAuthority: userInfo.wa_role === 'authority' || userInfo.api_role === 'SYSTEM_ADMIN',
           lastChecked: new Date()
         };
 

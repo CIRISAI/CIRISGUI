@@ -177,7 +177,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
               agentId: agent.agent_id,
               apiRole: currentUser.api_role || currentUser.role,
               waRole: currentUser.wa_role,
-              isAuthority: currentUser.wa_role === 'AUTHORITY',
+              isAuthority: currentUser.wa_role === 'authority',
               lastChecked: new Date()
             });
           }
