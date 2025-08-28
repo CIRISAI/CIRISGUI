@@ -233,35 +233,45 @@ export function WAMintModal({ user, onClose, onSuccess, isSelfMint = false }: WA
                         required={!useAutoSign || !keyExists}
                         rows={3}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono text-xs"
-                        placeholder="Paste the Ed25519 signature here..."
+                        placeholder="Paste ONLY the signature value (e.g., EjRdHhbaEySL...) - NOT the 'Signature:' prefix"
                       />
                       <p className="mt-1 text-xs text-gray-500">
-                        This action requires a valid signature from the ROOT private key
+                        Paste the base64 signature from the command output (without "Signature:" prefix)
                       </p>
                     </div>
                   )}
 
                   {showInstructions && (
-                    <div className="bg-gray-50 rounded-md p-4 text-xs">
-                      <h5 className="font-medium text-gray-900 mb-2">Signing Instructions:</h5>
-                      <ol className="list-decimal list-inside space-y-1 text-gray-600">
-                        <li>Use the signing tool with your ROOT private key at the path specified above</li>
-                        <li>Sign the message: <code className="bg-gray-100 px-1 py-0.5 rounded">MINT_WA:{user.user_id}:{waRole}</code></li>
-                        <li>Copy the base64-encoded signature</li>
-                        <li>Paste it in the signature field above</li>
-                      </ol>
-                      <div className="mt-3 p-2 bg-indigo-50 border border-indigo-200 rounded">
-                        <p className="text-indigo-800">
-                          <strong>Example command:</strong><br />
-                          <code className="text-xs">
-                            python /home/emoore/CIRISAgent/sign_wa_mint.py {user.user_id} {waRole} {privateKeyPath || '~/.ciris/wa_keys/root_wa.key'}
-                          </code>
-                        </p>
+                    <div className="bg-gray-50 rounded-md p-4 text-xs space-y-3">
+                      <h5 className="font-medium text-gray-900">How to Generate Your Signature:</h5>
+                      
+                      <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                        <p className="font-semibold text-blue-900 mb-2">Step 1: Run this command in your terminal:</p>
+                        <code className="block bg-white p-2 rounded text-xs font-mono break-all border border-blue-300">
+                          python /home/emoore/CIRISAgent/scripts/security/sign_wa_mint.py {user.user_id} {waRole} {privateKeyPath || '~/.ciris/wa_keys/root_wa.key'}
+                        </code>
                       </div>
-                      <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                        <p className="text-yellow-800">
-                          <strong>Security Note:</strong> Never share your ROOT private key.
-                          Sign messages offline and only share the signature.
+
+                      <div className="bg-green-50 border border-green-200 rounded p-3">
+                        <p className="font-semibold text-green-900 mb-1">Step 2: Copy ONLY the signature line:</p>
+                        <div className="bg-white p-2 rounded border border-green-300">
+                          <p className="text-gray-600 text-xs">The output will show:</p>
+                          <p className="font-mono text-xs text-gray-500">Message: MINT_WA:{user.user_id}:{waRole}</p>
+                          <p className="font-mono text-xs text-green-700 font-bold">
+                            Signature: <span className="bg-yellow-100 px-1">EjRdHhbaEySL...us9AAw==</span>
+                          </p>
+                          <p className="text-green-800 mt-2 font-semibold">↑ Copy this value (without "Signature:")</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-amber-50 border border-amber-200 rounded p-3">
+                        <p className="font-semibold text-amber-900 mb-1">Step 3: Paste the signature:</p>
+                        <p className="text-amber-800">Paste ONLY the base64 string (like "EjRdHhbaEySL...") into the signature field above</p>
+                      </div>
+
+                      <div className="bg-red-50 border border-red-200 rounded p-2">
+                        <p className="text-red-800 text-xs">
+                          <strong>⚠️ Security:</strong> Never share your private key. Only paste the signature.
                         </p>
                       </div>
                     </div>
