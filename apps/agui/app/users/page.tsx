@@ -124,8 +124,8 @@ export default function UsersPage() {
           <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
             {/* Show self-mint button if current user is not a WA and either:
                 1. No WAs exist in the system (bootstrap scenario)
-                2. User is SYSTEM_ADMIN (can always self-mint) */}
-            {currentUserDetails && !currentUserDetails.wa_role && (!hasExistingWAs || hasRole('SYSTEM_ADMIN')) && (
+                2. User is SYSTEM_ADMIN or ADMIN (can always self-mint) */}
+            {currentUserDetails && !currentUserDetails.wa_role && (!hasExistingWAs || hasRole('SYSTEM_ADMIN') || hasRole('ADMIN')) && (
               <button
                 onClick={() => {
                   setWAMintUser(currentUserDetails);
