@@ -233,10 +233,18 @@ export class SystemResource extends BaseResource {
   }
 
   /**
-   * Execute a single processing step
+   * Execute a single processing step (basic)
    */
   async singleStepProcessor(): Promise<RuntimeControlExtendedResponse> {
     return this.transport.post<RuntimeControlExtendedResponse>('/v1/system/runtime/step');
+  }
+
+  /**
+   * Execute a single processing step with enhanced detailed data
+   */
+  async singleStepProcessorEnhanced(includeDetails: boolean = true): Promise<import('../types').EnhancedSingleStepResponse> {
+    const params = includeDetails ? { include_details: 'true' } : {};
+    return this.transport.post('/v1/system/runtime/single-step', {}, { params });
   }
 
   /**

@@ -3,18 +3,14 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { cirisClient } from '../../lib/ciris-sdk';
+import { AuditEntry } from '../../lib/ciris-sdk/types';
 import { format } from 'date-fns';
-import { ArrowDownTrayIcon, FunnelIcon, ArrowPathIcon, PlayIcon, CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, FunnelIcon, ArrowPathIcon, PlayIcon, CheckCircleIcon, XCircleIcon, ClockIcon, KeyIcon, LinkIcon, ServerIcon } from '@heroicons/react/24/outline';
 import { SpinnerIcon, ClipboardIcon } from '../../components/Icons';
 
-interface AuditEntry {
-  id?: string;
-  timestamp: string;
-  service?: string;
-  action: string;
-  user_id?: string;
+// Extended interface for backward compatibility with existing data structure
+interface ExtendedAuditEntry extends AuditEntry {
   actor?: string;
-  details?: any;
   result?: string;
   status?: string;
   severity?: 'info' | 'warning' | 'error' | 'critical';
@@ -79,7 +75,7 @@ export default function AuditPage() {
 
   // Filter out start events if requested
   if (hideStartEvents) {
-    entries = entries.filter((entry: AuditEntry) => {
+    entries = entries.filter((entry: ExtendedAuditEntry) => {
       const outcome = entry.context?.metadata?.outcome || entry.result || entry.status;
       return outcome !== 'start';
     });
@@ -159,8 +155,8 @@ export default function AuditPage() {
     }
   };
 
-  const convertToCSV = (entries: AuditEntry[]) => {
-    const headers = ['Timestamp', 'Service', 'Action', 'User/Actor', 'Details', 'Status', 'Result'];
+  const convertToCSV = (entries: ExtendedAuditEntry[]) => {
+    const headers = ['Timestamp', 'Service', 'Action', 'User/Actor', 'Details', 'Status', 'Result', 'Storage Sources', 'Signature', 'Hash Chain'];
     const rows = entries.map(entry => [
       entry.timestamp,
       entry.service || '',
@@ -168,7 +164,10 @@ export default function AuditPage() {
       entry.user_id || entry.actor || 'System',
       JSON.stringify(entry.details || {}),
       entry.status || '',
-      entry.result || 'success'
+      entry.result || 'success',
+      (entry.storage_sources || []).join(';'),
+      entry.signature || '',
+      entry.hash_chain || ''
     ]);
 
     return [
@@ -177,7 +176,7 @@ export default function AuditPage() {
     ].join('\n');
   };
 
-  const getSeverityColor = (entry: AuditEntry) => {
+  const getSeverityColor = (entry: ExtendedAuditEntry) => {
     // Determine severity based on action and result
     const outcome = entry.context?.metadata?.outcome || entry.result || entry.status;
     if (outcome === 'error' || outcome === 'failure' || outcome === 'failed') {
@@ -416,6 +415,9 @@ export default function AuditPage() {
                     Details
                   </th>
                   <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                    Security & Storage
+                  </th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                     Outcome
                   </th>
                 </tr>
@@ -423,7 +425,7 @@ export default function AuditPage() {
               <tbody className="divide-y divide-gray-200 bg-white">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-500">
+                    <td colSpan={7} className="text-center py-8 text-gray-500">
                       <div className="inline-flex items-center">
                         <SpinnerIcon className="-ml-1 mr-3 text-gray-500" size="md" />
                         Loading audit entries...
@@ -432,7 +434,7 @@ export default function AuditPage() {
                   </tr>
                 ) : entries?.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-500">
+                    <td colSpan={7} className="text-center py-8 text-gray-500">
                       <div>
                         <ClipboardIcon className="mx-auto text-gray-400" size="lg" />
                         <p className="mt-2 text-sm">No audit entries found</p>
@@ -441,7 +443,7 @@ export default function AuditPage() {
                     </td>
                   </tr>
                 ) : (
-                  entries?.map((entry: AuditEntry, idx: number) => (
+                  entries?.map((entry: ExtendedAuditEntry, idx: number) => (
                     <tr key={entry.id || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
                         <div className="flex flex-col">
@@ -497,6 +499,48 @@ export default function AuditPage() {
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
+                      </td>
+                      <td className="px-3 py-4 text-sm text-gray-500">
+                        <div className="space-y-1">
+                          {/* Storage Sources */}
+                          {entry.storage_sources && entry.storage_sources.length > 0 ? (
+                            <div className="flex items-center space-x-1">
+                              <ServerIcon className="h-3 w-3 text-blue-500" />
+                              <div className="flex flex-wrap gap-1">
+                                {entry.storage_sources.map((source, sourceIdx) => (
+                                  <span key={sourceIdx} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                    {source}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                          
+                          {/* Hash Chain */}
+                          {entry.hash_chain ? (
+                            <div className="flex items-center space-x-1">
+                              <LinkIcon className="h-3 w-3 text-green-500" />
+                              <span className="text-xs font-mono text-gray-600" title={entry.hash_chain}>
+                                {entry.hash_chain.slice(0, 12)}...
+                              </span>
+                            </div>
+                          ) : null}
+                          
+                          {/* Signature */}
+                          {entry.signature ? (
+                            <div className="flex items-center space-x-1">
+                              <KeyIcon className="h-3 w-3 text-purple-500" />
+                              <span className="text-xs font-mono text-gray-600" title={entry.signature}>
+                                {entry.signature.slice(0, 12)}...
+                              </span>
+                            </div>
+                          ) : null}
+
+                          {/* Show placeholder if no security data */}
+                          {!entry.storage_sources?.length && !entry.hash_chain && !entry.signature && (
+                            <span className="text-gray-400 text-xs">No security data</span>
+                          )}
+                        </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm">
                         <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${getSeverityColor(entry)}`}>
