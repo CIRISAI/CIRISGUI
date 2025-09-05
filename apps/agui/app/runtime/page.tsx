@@ -22,6 +22,9 @@ export default function RuntimeControlPage() {
     processing_time_ms?: number;
     tokens_used?: number;
   } | null>(null);
+  
+  // Track processor state from API responses
+  const [processorState, setProcessorState] = useState<string>('running');
 
   // Fetch runtime state
   const { data: runtimeState, refetch: refetchRuntimeState } = useQuery({
@@ -67,8 +70,12 @@ export default function RuntimeControlPage() {
       }
       return cirisClient.system.pauseRuntime();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast.success('Runtime paused');
+      // Update processor state from API response
+      if (data.processor_state) {
+        setProcessorState(data.processor_state);
+      }
       refetchRuntimeState();
     },
     onError: (error: any) => {
@@ -84,8 +91,12 @@ export default function RuntimeControlPage() {
       }
       return cirisClient.system.resumeRuntime();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast.success('Runtime resumed');
+      // Update processor state from API response
+      if (data.processor_state) {
+        setProcessorState(data.processor_state === 'active' ? 'running' : data.processor_state);
+      }
       setCurrentStepPoint(null);
       setLastStepResult(null);
       setLastStepMetrics(null);
@@ -128,8 +139,8 @@ export default function RuntimeControlPage() {
     }
   }, [currentStepPoint]);
 
-  const isPaused = runtimeState?.processor_state === 'paused';
-  const isRunning = runtimeState?.processor_state === 'running';
+  const isPaused = processorState === 'paused';
+  const isRunning = processorState === 'running';
 
   return (
     <div className="space-y-6">
@@ -154,7 +165,7 @@ export default function RuntimeControlPage() {
                 className="mr-2" 
               />
               <span className="text-sm font-medium text-gray-600">
-                {runtimeState?.processor_state?.toUpperCase() || 'UNKNOWN'}
+                {processorState?.toUpperCase() || 'UNKNOWN'}
               </span>
             </div>
           </div>

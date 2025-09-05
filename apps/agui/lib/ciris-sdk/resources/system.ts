@@ -80,26 +80,30 @@ export class SystemResource extends BaseResource {
   /**
    * Pause runtime processing
    */
-  async pauseRuntime(): Promise<RuntimeControlResponse> {
+  async pauseRuntime(): Promise<RuntimeControlResponse & { processor_state?: string; cognitive_state?: string }> {
     const response = await this.transport.post('/v1/system/runtime/pause', {});
     const data = response.data || response;
     return {
       status: data.success ? 'success' : 'error',
       message: data.message || 'Runtime paused',
-      timestamp: response.metadata?.timestamp || new Date().toISOString()
+      timestamp: response.metadata?.timestamp || new Date().toISOString(),
+      processor_state: data.processor_state,
+      cognitive_state: data.cognitive_state
     };
   }
 
   /**
    * Resume runtime processing
    */
-  async resumeRuntime(): Promise<RuntimeControlResponse> {
+  async resumeRuntime(): Promise<RuntimeControlResponse & { processor_state?: string; cognitive_state?: string }> {
     const response = await this.transport.post('/v1/system/runtime/resume', {});
     const data = response.data || response;
     return {
       status: data.success ? 'success' : 'error',
       message: data.message || 'Runtime resumed', 
-      timestamp: response.metadata?.timestamp || new Date().toISOString()
+      timestamp: response.metadata?.timestamp || new Date().toISOString(),
+      processor_state: data.processor_state,
+      cognitive_state: data.cognitive_state
     };
   }
 
@@ -139,22 +143,35 @@ export class SystemResource extends BaseResource {
     cognitive_state: string;
     queue_depth: number;
   }> {
-    // Get state info from health and queue endpoints
-    const [health, queue] = await Promise.all([
-      this.transport.get('/v1/system/health'),
-      this.transport.get('/v1/system/runtime/queue')
-    ]);
-    
-    const healthData = health.data || health;
-    const queueData = queue.data || queue;
-    
-    return {
-      success: true,
-      message: 'Runtime state retrieved',
-      processor_state: healthData.status === 'healthy' ? 'running' : 'unknown',
-      cognitive_state: healthData.cognitive_state || 'work',
-      queue_depth: queueData.queue_size || 0
-    };
+    try {
+      // Get basic information from health and queue endpoints
+      const [health, queue] = await Promise.all([
+        this.transport.get('/v1/system/health').catch(() => null),
+        this.transport.get('/v1/system/runtime/queue').catch(() => null)
+      ]);
+      
+      const healthData = health?.data || health;
+      const queueData = queue?.data || queue;
+      
+      // For now, we can only determine paused state from pause/resume operations
+      // This method should be called after pause/resume to get current state
+      // In normal query mode, we return 'running' as default since that's the normal state
+      return {
+        success: true,
+        message: 'Runtime state retrieved',
+        processor_state: 'running', // Default assumption - will be updated by mutations
+        cognitive_state: healthData?.cognitive_state || 'work',
+        queue_depth: queueData?.queue_size || 0
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: 'Failed to retrieve runtime state',
+        processor_state: 'unknown',
+        cognitive_state: 'work',
+        queue_depth: 0
+      };
+    }
   }
 
 
