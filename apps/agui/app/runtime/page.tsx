@@ -33,6 +33,9 @@ export default function RuntimeControlPage() {
   // Enhanced single-step mutation
   const singleStepMutation = useMutation({
     mutationFn: async (): Promise<EnhancedSingleStepResponse> => {
+      if (!hasRole('ADMIN')) {
+        throw new Error('Admin privileges required to execute single steps');
+      }
       return await cirisClient.system.singleStepProcessorEnhanced(true);
     },
     onSuccess: (data) => {
@@ -51,24 +54,36 @@ export default function RuntimeControlPage() {
       refetchRuntimeState();
     },
     onError: (error: any) => {
-      toast.error(`Step failed: ${error.message || 'Unknown error'}`);
+      const message = error.message || 'Unknown error';
+      toast.error(`Step failed: ${message}`);
     },
   });
 
   // Runtime control mutations
   const pauseMutation = useMutation({
-    mutationFn: () => cirisClient.system.pauseRuntime(),
+    mutationFn: () => {
+      if (!hasRole('ADMIN')) {
+        throw new Error('Admin privileges required to pause runtime');
+      }
+      return cirisClient.system.pauseRuntime();
+    },
     onSuccess: () => {
       toast.success('Runtime paused');
       refetchRuntimeState();
     },
-    onError: () => {
-      toast.error('Failed to pause runtime');
+    onError: (error: any) => {
+      const message = error.message || 'Failed to pause runtime';
+      toast.error(message);
     },
   });
 
   const resumeMutation = useMutation({
-    mutationFn: () => cirisClient.system.resumeRuntime(),
+    mutationFn: () => {
+      if (!hasRole('ADMIN')) {
+        throw new Error('Admin privileges required to resume runtime');
+      }
+      return cirisClient.system.resumeRuntime();
+    },
     onSuccess: () => {
       toast.success('Runtime resumed');
       setCurrentStepPoint(null);
@@ -76,8 +91,9 @@ export default function RuntimeControlPage() {
       setLastStepMetrics(null);
       refetchRuntimeState();
     },
-    onError: () => {
-      toast.error('Failed to resume runtime');
+    onError: (error: any) => {
+      const message = error.message || 'Failed to resume runtime';
+      toast.error(message);
     },
   });
 
@@ -145,9 +161,25 @@ export default function RuntimeControlPage() {
 
           {/* Control Buttons */}
           <div className="flex items-center space-x-4 mb-6">
+            {!hasRole('ADMIN') && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">Admin Access Required</h3>
+                    <p className="text-sm text-yellow-700 mt-1">Runtime control operations require Administrator privileges. You can view the current state but cannot modify runtime execution.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <button
               onClick={() => pauseMutation.mutate()}
-              disabled={isPaused || pauseMutation.isPending}
+              disabled={isPaused || pauseMutation.isPending || !hasRole('ADMIN')}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {pauseMutation.isPending ? 'Pausing...' : 'Pause'}
@@ -155,7 +187,7 @@ export default function RuntimeControlPage() {
 
             <button
               onClick={() => resumeMutation.mutate()}
-              disabled={!isPaused || resumeMutation.isPending}
+              disabled={!isPaused || resumeMutation.isPending || !hasRole('ADMIN')}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {resumeMutation.isPending ? 'Resuming...' : 'Resume'}
@@ -163,11 +195,15 @@ export default function RuntimeControlPage() {
 
             <button
               onClick={() => singleStepMutation.mutate()}
-              disabled={!isPaused || singleStepMutation.isPending}
+              disabled={!isPaused || singleStepMutation.isPending || !hasRole('ADMIN')}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {singleStepMutation.isPending ? 'Stepping...' : 'Single Step'}
             </button>
+            
+            {!hasRole('ADMIN') && (
+              <span className="text-sm text-gray-500 ml-4">Controls disabled - Admin role required</span>
+            )}
           </div>
 
           {/* Pipeline Status Info */}
