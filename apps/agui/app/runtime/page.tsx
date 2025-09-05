@@ -7,7 +7,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { StatusDot } from '../../components/Icons';
 import { StepVisualization } from './components/StepVisualization';
-import { isDemoMode, getDemoStepResult } from './components/DemoData';
 import { 
   StepPoint, 
   StepResult, 
@@ -275,55 +274,6 @@ export default function RuntimeControlPage() {
         </div>
       )}
 
-      {/* Demo Mode Section */}
-      {isDemoMode() && (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-purple-900">🎭 Demo Mode</h3>
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
-              Sample Data Active
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button
-              onClick={() => {
-                setCurrentStepPoint(StepPoint.FINALIZE_TASKS_QUEUE);
-                setLastStepResult(getDemoStepResult(StepPoint.FINALIZE_TASKS_QUEUE));
-                setLastStepMetrics({ processing_time_ms: 23, tokens_used: 0 });
-                toast.success('Demo: Task Queue Finalization');
-              }}
-              className="p-4 bg-white rounded-lg border-2 border-purple-200 hover:border-purple-300 text-left"
-            >
-              <div className="font-medium text-purple-900">1. Task Queue</div>
-              <div className="text-sm text-purple-700 mt-1">Show task prioritization</div>
-            </button>
-            <button
-              onClick={() => {
-                setCurrentStepPoint(StepPoint.PERFORM_DMAS);
-                setLastStepResult(getDemoStepResult(StepPoint.PERFORM_DMAS));
-                setLastStepMetrics({ processing_time_ms: 378, tokens_used: 245 });
-                toast.success('Demo: Multi-DMA Reasoning');
-              }}
-              className="p-4 bg-white rounded-lg border-2 border-purple-200 hover:border-purple-300 text-left"
-            >
-              <div className="font-medium text-purple-900">5. Multi-DMA</div>
-              <div className="text-sm text-purple-700 mt-1">Ethical reasoning showcase</div>
-            </button>
-            <button
-              onClick={() => {
-                setCurrentStepPoint(StepPoint.CONSCIENCE_EXECUTION);
-                setLastStepResult(getDemoStepResult(StepPoint.CONSCIENCE_EXECUTION));
-                setLastStepMetrics({ processing_time_ms: 298, tokens_used: 156 });
-                toast.success('Demo: Conscience Evaluation');
-              }}
-              className="p-4 bg-white rounded-lg border-2 border-purple-200 hover:border-purple-300 text-left"
-            >
-              <div className="font-medium text-purple-900">7. Conscience</div>
-              <div className="text-sm text-purple-700 mt-1">Safety validation checks</div>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Instructions */}
       <div className="bg-blue-50 rounded-lg p-4">
@@ -341,9 +291,6 @@ export default function RuntimeControlPage() {
                 <li><strong>Single Step</strong> executes one pipeline step and shows detailed results</li>
                 <li><strong>Resume</strong> continues normal runtime processing</li>
                 <li>Visual indicators on the architecture diagram show current processing step</li>
-                {isDemoMode() && (
-                  <li className="text-purple-700"><strong>Demo Mode:</strong> Add ?demo=true to URL for sample visualizations</li>
-                )}
               </ol>
             </div>
           </div>

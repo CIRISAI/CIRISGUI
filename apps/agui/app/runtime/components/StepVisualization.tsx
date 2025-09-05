@@ -430,7 +430,7 @@ function PerformDMAsVisualization({ stepResult }: { stepResult: StepResultPerfor
   );
 }
 
-// Step 7: CONSCIENCE_EXECUTION - Critical ethics demonstration
+// Step 7: CONSCIENCE_EXECUTION - Critical ethics evaluation
 function ConscienceExecutionVisualization({ stepResult }: { stepResult: StepResultConscienceExecution }) {
   return (
     <div className="space-y-4">

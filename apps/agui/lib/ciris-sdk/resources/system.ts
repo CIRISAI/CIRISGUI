@@ -81,14 +81,26 @@ export class SystemResource extends BaseResource {
    * Pause runtime processing
    */
   async pauseRuntime(): Promise<RuntimeControlResponse> {
-    return this.transport.post<RuntimeControlResponse>('/v1/system/runtime/pause');
+    const response = await this.transport.post('/v1/system/runtime/pause');
+    const data = response.data || response;
+    return {
+      status: data.success ? 'success' : 'error',
+      message: data.message || 'Runtime paused',
+      timestamp: response.metadata?.timestamp || new Date().toISOString()
+    };
   }
 
   /**
    * Resume runtime processing
    */
   async resumeRuntime(): Promise<RuntimeControlResponse> {
-    return this.transport.post<RuntimeControlResponse>('/v1/system/runtime/resume');
+    const response = await this.transport.post('/v1/system/runtime/resume');
+    const data = response.data || response;
+    return {
+      status: data.success ? 'success' : 'error',
+      message: data.message || 'Runtime resumed', 
+      timestamp: response.metadata?.timestamp || new Date().toISOString()
+    };
   }
 
   /**
@@ -127,7 +139,22 @@ export class SystemResource extends BaseResource {
     cognitive_state: string;
     queue_depth: number;
   }> {
-    return this.transport.post('/v1/system/runtime/state', {});
+    // Get state info from health and queue endpoints
+    const [health, queue] = await Promise.all([
+      this.transport.get('/v1/system/health'),
+      this.transport.get('/v1/system/runtime/queue')
+    ]);
+    
+    const healthData = health.data || health;
+    const queueData = queue.data || queue;
+    
+    return {
+      success: true,
+      message: 'Runtime state retrieved',
+      processor_state: healthData.status === 'healthy' ? 'running' : 'unknown',
+      cognitive_state: healthData.cognitive_state || 'work',
+      queue_depth: queueData.queue_size || 0
+    };
   }
 
 
@@ -243,8 +270,22 @@ export class SystemResource extends BaseResource {
    * Execute a single processing step with enhanced detailed data
    */
   async singleStepProcessorEnhanced(includeDetails: boolean = true): Promise<import('../types').EnhancedSingleStepResponse> {
-    const params = includeDetails ? { include_details: 'true' } : {};
-    return this.transport.post('/v1/system/runtime/single-step', {}, { params });
+    const body = includeDetails ? { include_details: true } : {};
+    const response = await this.transport.post('/v1/system/runtime/single-step', body);
+    const data = response.data || response;
+    
+    // Transform the response to match expected format
+    return {
+      success: data.success || false,
+      message: data.message || 'Single step completed',
+      step_point: data.step_point || null,
+      step_result: data.step_result || null,
+      processing_time_ms: data.processing_time_ms || 0,
+      tokens_used: data.tokens_used || 0,
+      processor_state: data.processor_state || 'unknown',
+      cognitive_state: data.cognitive_state || 'work',
+      queue_depth: data.queue_depth || 0
+    };
   }
 
   /**
