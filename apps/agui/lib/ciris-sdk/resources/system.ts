@@ -81,7 +81,7 @@ export class SystemResource extends BaseResource {
    * Pause runtime processing
    */
   async pauseRuntime(): Promise<RuntimeControlResponse> {
-    const response = await this.transport.post('/v1/system/runtime/pause');
+    const response = await this.transport.post('/v1/system/runtime/pause', {});
     const data = response.data || response;
     return {
       status: data.success ? 'success' : 'error',
@@ -94,7 +94,7 @@ export class SystemResource extends BaseResource {
    * Resume runtime processing
    */
   async resumeRuntime(): Promise<RuntimeControlResponse> {
-    const response = await this.transport.post('/v1/system/runtime/resume');
+    const response = await this.transport.post('/v1/system/runtime/resume', {});
     const data = response.data || response;
     return {
       status: data.success ? 'success' : 'error',
