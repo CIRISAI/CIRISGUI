@@ -287,8 +287,9 @@ export class SystemResource extends BaseResource {
    * Execute a single processing step with enhanced detailed data
    */
   async singleStepProcessorEnhanced(includeDetails: boolean = true): Promise<import('../types').EnhancedSingleStepResponse> {
-    const body = includeDetails ? { include_details: true } : {};
-    const response = await this.transport.post('/v1/system/runtime/single-step', body);
+    // Use query parameter for include_details as per API specification
+    const path = includeDetails ? '/v1/system/runtime/step?include_details=true' : '/v1/system/runtime/step';
+    const response = await this.transport.post(path, {});
     const data = response.data || response;
     
     // Transform the response to match expected format
@@ -301,7 +302,10 @@ export class SystemResource extends BaseResource {
       tokens_used: data.tokens_used || 0,
       processor_state: data.processor_state || 'unknown',
       cognitive_state: data.cognitive_state || 'work',
-      queue_depth: data.queue_depth || 0
+      queue_depth: data.queue_depth || 0,
+      // Add new fields from v1.0.9 API
+      pipeline_state: data.pipeline_state || null,
+      demo_data: data.demo_data || null
     };
   }
 
