@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cirisClient } from '../../lib/ciris-sdk';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,11 +13,36 @@ import {
   EnhancedSingleStepResponse 
 } from '../../lib/ciris-sdk/types';
 
+// H3ERE Pipeline Step Points (11 steps: 0-10)
+enum H3EREStepPoint {
+  START_ROUND = 'START_ROUND',
+  GATHER_CONTEXT = 'GATHER_CONTEXT', 
+  PERFORM_DMAS = 'PERFORM_DMAS',
+  PERFORM_ASPDMA = 'PERFORM_ASPDMA',
+  CONSCIENCE_EXECUTION = 'CONSCIENCE_EXECUTION',
+  RECURSIVE_ASPDMA = 'RECURSIVE_ASPDMA',
+  RECURSIVE_CONSCIENCE = 'RECURSIVE_CONSCIENCE', 
+  FINALIZE_ACTION = 'FINALIZE_ACTION',
+  PERFORM_ACTION = 'PERFORM_ACTION',
+  ACTION_COMPLETE = 'ACTION_COMPLETE',
+  ROUND_COMPLETE = 'ROUND_COMPLETE'
+}
+
+interface StreamStepData {
+  step_point?: H3EREStepPoint;
+  step_result?: any;
+  processing_time_ms?: number;
+  tokens_used?: number;
+  pipeline_state?: any;
+  transparency_data?: any;
+  timestamp: string;
+}
+
 export default function RuntimeControlPage() {
   const { hasRole } = useAuth();
   const queryClient = useQueryClient();
-  const [currentStepPoint, setCurrentStepPoint] = useState<StepPoint | null>(null);
-  const [lastStepResult, setLastStepResult] = useState<StepResult | null>(null);
+  const [currentStepPoint, setCurrentStepPoint] = useState<H3EREStepPoint | null>(null);
+  const [lastStepResult, setLastStepResult] = useState<any | null>(null);
   const [lastStepMetrics, setLastStepMetrics] = useState<{
     processing_time_ms?: number;
     tokens_used?: number;
@@ -25,6 +50,12 @@ export default function RuntimeControlPage() {
   
   // Track processor state from API responses
   const [processorState, setProcessorState] = useState<string>('running');
+  
+  // Streaming state
+  const [streamData, setStreamData] = useState<StreamStepData[]>([]);
+  const [streamConnected, setStreamConnected] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   // Fetch runtime state
   const { data: runtimeState, refetch: refetchRuntimeState } = useQuery({
@@ -43,8 +74,10 @@ export default function RuntimeControlPage() {
     },
     onSuccess: (data) => {
       toast.success(`Step completed: ${data.message}`);
+      // Convert old StepPoint to H3EREStepPoint if needed
       if (data.step_point) {
-        setCurrentStepPoint(data.step_point);
+        // For now, just log the step - the streaming endpoint will handle updates
+        console.log('Single step completed:', data.step_point);
       }
       if (data.step_result) {
         setLastStepResult(data.step_result);
@@ -108,27 +141,99 @@ export default function RuntimeControlPage() {
     },
   });
 
-  // Get step point display names
-  const getStepDisplayName = (step: StepPoint): string => {
-    const names: Record<StepPoint, string> = {
-      [StepPoint.FINALIZE_TASKS_QUEUE]: '1. Finalize Tasks Queue',
-      [StepPoint.POPULATE_THOUGHT_QUEUE]: '2. Populate Thought Queue',
-      [StepPoint.POPULATE_ROUND]: '3. Populate Round',
-      [StepPoint.BUILD_CONTEXT]: '4. Build Context',
-      [StepPoint.PERFORM_DMAS]: '5. Perform DMAs',
-      [StepPoint.PERFORM_ASPDMA]: '6. Perform ASPDMA',
-      [StepPoint.CONSCIENCE_EXECUTION]: '7. Conscience Execution',
-      [StepPoint.RECURSIVE_ASPDMA]: '8. Recursive ASPDMA',
-      [StepPoint.RECURSIVE_CONSCIENCE]: '9. Recursive Conscience',
-      [StepPoint.ACTION_SELECTION]: '10. Action Selection',
-      [StepPoint.HANDLER_START]: '11. Handler Start',
-      [StepPoint.BUS_OUTBOUND]: '12. Bus Outbound',
-      [StepPoint.PACKAGE_HANDLING]: '13. Package Handling',
-      [StepPoint.BUS_INBOUND]: '14. Bus Inbound',
-      [StepPoint.HANDLER_COMPLETE]: '15. Handler Complete'
+  // H3ERE Pipeline step display names (11 steps: 0-10)
+  const getH3EREStepDisplayName = (step: H3EREStepPoint): string => {
+    const names: Record<H3EREStepPoint, string> = {
+      [H3EREStepPoint.START_ROUND]: '0. Start Round',
+      [H3EREStepPoint.GATHER_CONTEXT]: '1. Gather Context',
+      [H3EREStepPoint.PERFORM_DMAS]: '2. Perform DMAs',
+      [H3EREStepPoint.PERFORM_ASPDMA]: '3. Perform ASPDMA', 
+      [H3EREStepPoint.CONSCIENCE_EXECUTION]: '4. Conscience Execution',
+      [H3EREStepPoint.RECURSIVE_ASPDMA]: '3B. Recursive ASPDMA',
+      [H3EREStepPoint.RECURSIVE_CONSCIENCE]: '4B. Recursive Conscience',
+      [H3EREStepPoint.FINALIZE_ACTION]: '5. Finalize Action',
+      [H3EREStepPoint.PERFORM_ACTION]: '6. Perform Action',
+      [H3EREStepPoint.ACTION_COMPLETE]: '7. Action Complete',
+      [H3EREStepPoint.ROUND_COMPLETE]: '8. Round Complete'
     };
     return names[step] || step;
   };
+
+  // Initialize Server-Sent Events stream for real-time step updates
+  useEffect(() => {
+    const token = cirisClient.auth.getAccessToken();
+    if (!token) {
+      setStreamError('Authentication required for streaming');
+      return;
+    }
+
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+    const streamUrl = `${apiBaseUrl}/v1/system/runtime/reasoning-stream?token=${encodeURIComponent(token)}`;
+    
+    console.log('🔌 Connecting to reasoning stream:', streamUrl);
+    
+    const eventSource = new EventSource(streamUrl);
+    
+    eventSourceRef.current = eventSource;
+
+    eventSource.addEventListener('connected', (event) => {
+      console.log('✅ Stream connected:', (event as MessageEvent).data);
+      setStreamConnected(true);
+      setStreamError(null);
+    });
+
+    eventSource.addEventListener('step_update', (event) => {
+      try {
+        const stepData: StreamStepData = JSON.parse((event as MessageEvent).data);
+        console.log('📊 Step update received:', stepData);
+        
+        setStreamData(prev => [...prev.slice(-99), stepData]); // Keep last 100 updates
+        
+        if (stepData.step_point) {
+          setCurrentStepPoint(stepData.step_point);
+        }
+        if (stepData.step_result) {
+          setLastStepResult(stepData.step_result);
+        }
+        if (stepData.processing_time_ms || stepData.tokens_used) {
+          setLastStepMetrics({
+            processing_time_ms: stepData.processing_time_ms,
+            tokens_used: stepData.tokens_used
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error parsing step update:', error);
+      }
+    });
+
+    eventSource.addEventListener('keepalive', (event) => {
+      console.log('💓 Stream keepalive');
+    });
+
+    eventSource.addEventListener('error', (event) => {
+      try {
+        const errorData = JSON.parse((event as MessageEvent).data);
+        console.error('❌ Stream error:', errorData);
+        setStreamError(`Stream error: ${errorData.message || 'Unknown error'}`);
+      } catch {
+        console.error('❌ Stream connection error');
+        setStreamError('Stream connection failed');
+      }
+      setStreamConnected(false);
+    });
+
+    eventSource.onerror = (error) => {
+      console.error('❌ EventSource error:', error);
+      setStreamError('Connection lost - attempting to reconnect...');
+      setStreamConnected(false);
+    };
+
+    return () => {
+      console.log('🔌 Closing stream connection');
+      eventSource.close();
+      eventSourceRef.current = null;
+    };
+  }, []);
 
   // Visual step indicators for SVG highlighting
   useEffect(() => {
@@ -236,7 +341,7 @@ export default function RuntimeControlPage() {
             <div className="bg-gray-50 px-4 py-5 sm:p-6 rounded-lg">
               <dt className="text-sm font-medium text-gray-500">Current Step</dt>
               <dd className="mt-1 text-lg font-semibold text-blue-600">
-                {currentStepPoint ? getStepDisplayName(currentStepPoint) : 'None'}
+                {currentStepPoint ? getH3EREStepDisplayName(currentStepPoint) : 'None'}
               </dd>
             </div>
 
@@ -257,10 +362,39 @@ export default function RuntimeControlPage() {
         </div>
       </div>
 
-      {/* CIRIS Architecture Diagram */}
+      {/* Stream Status */}
       <div className="bg-white shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">CIRIS Architecture Pipeline</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900">Real-time Stream Status</h3>
+            <div className="flex items-center space-x-2">
+              <StatusDot 
+                status={streamConnected ? 'green' : 'red'} 
+                className="mr-2" 
+              />
+              <span className="text-sm font-medium text-gray-600">
+                {streamConnected ? 'CONNECTED' : 'DISCONNECTED'}
+              </span>
+            </div>
+          </div>
+          
+          {streamError && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+              <p className="text-sm text-red-800">{streamError}</p>
+            </div>
+          )}
+          
+          <div className="text-sm text-gray-600">
+            <p>Updates received: {streamData.length}</p>
+            <p>Endpoint: /v1/system/runtime/reasoning-stream</p>
+          </div>
+        </div>
+      </div>
+
+      {/* H3ERE Pipeline Visualization */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">H3ERE Pipeline (11 Step Points)</h3>
           
           {/* SVG Container with responsive sizing */}
           <div className="w-full overflow-x-auto">
@@ -280,11 +414,11 @@ export default function RuntimeControlPage() {
             </div>
           </div>
 
-          {/* Step Indicator Legend */}
+          {/* H3ERE Step Indicator Legend */}
           <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">Pipeline Step Indicators</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 text-xs">
-              {Object.values(StepPoint).map((step, index) => (
+            <h4 className="text-sm font-medium text-blue-900 mb-2">H3ERE Pipeline Step Indicators</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+              {Object.values(H3EREStepPoint).map((step) => (
                 <div 
                   key={step}
                   className={`flex items-center space-x-1 px-2 py-1 rounded ${
@@ -293,10 +427,18 @@ export default function RuntimeControlPage() {
                       : 'text-blue-700'
                   }`}
                 >
-                  <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                  <span>{getStepDisplayName(step)}</span>
+                  <span className={`w-2 h-2 rounded-full ${
+                    currentStepPoint === step ? 'bg-blue-600 animate-pulse' : 'bg-blue-400'
+                  }`}></span>
+                  <span>{getH3EREStepDisplayName(step)}</span>
+                  {step === H3EREStepPoint.RECURSIVE_ASPDMA && <span className="text-orange-600">(conditional)</span>}
+                  {step === H3EREStepPoint.RECURSIVE_CONSCIENCE && <span className="text-orange-600">(conditional)</span>}
                 </div>
               ))}
+            </div>
+            
+            <div className="mt-3 text-xs text-blue-600">
+              <p><strong>Note:</strong> Steps 3B & 4B are conditional - only executed when conscience evaluation fails.</p>
             </div>
           </div>
         </div>
@@ -307,16 +449,45 @@ export default function RuntimeControlPage() {
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Step Details</h3>
+              <h3 className="text-lg font-medium text-gray-900">Live Step Details</h3>
               <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                {getStepDisplayName(currentStepPoint)}
+                {getH3EREStepDisplayName(currentStepPoint)}
               </div>
             </div>
             
-            <StepVisualization 
-              stepResult={lastStepResult} 
-              stepPoint={currentStepPoint} 
-            />
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <h4 className="font-medium text-gray-900 mb-2">Raw Step Data:</h4>
+              <pre className="text-sm text-gray-600 overflow-x-auto">
+                {JSON.stringify(lastStepResult, null, 2)}
+              </pre>
+            </div>
+            
+            {/* Stream Data History */}
+            {streamData.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-900 mb-2">Recent Updates ({streamData.slice(-5).length} of {streamData.length}):</h4>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {streamData.slice(-5).reverse().map((data, index) => (
+                    <div key={index} className="text-xs bg-white border rounded p-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-blue-600">
+                          {data.step_point ? getH3EREStepDisplayName(data.step_point) : 'No step point'}
+                        </span>
+                        <span className="text-gray-500">
+                          {new Date(data.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      {data.processing_time_ms && (
+                        <span className="text-green-600">⏱️ {data.processing_time_ms}ms</span>
+                      )}
+                      {data.tokens_used && (
+                        <span className="text-purple-600 ml-2">🪙 {data.tokens_used} tokens</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -334,10 +505,11 @@ export default function RuntimeControlPage() {
             <h3 className="text-sm font-medium text-blue-800">How to use Runtime Control</h3>
             <div className="mt-2 text-sm text-blue-700">
               <ol className="list-decimal list-inside space-y-1">
-                <li><strong>Pause</strong> the runtime to enable step-by-step debugging</li>
-                <li><strong>Single Step</strong> executes one pipeline step and shows detailed results</li>
-                <li><strong>Resume</strong> continues normal runtime processing</li>
-                <li>Visual indicators on the architecture diagram show current processing step</li>
+                <li><strong>Real-time Stream</strong>: Connects to /v1/system/runtime/reasoning-stream for live updates</li>
+                <li><strong>H3ERE Pipeline</strong>: 11 step points (0-10) with conditional recursive steps</li>
+                <li><strong>Pause/Resume</strong>: Control processing while maintaining stream connection</li>
+                <li><strong>Single Step</strong>: Execute one pipeline step (when paused)</li>
+                <li><strong>Live Visualization</strong>: See reasoning process in real-time during normal operation</li>
               </ol>
             </div>
           </div>
