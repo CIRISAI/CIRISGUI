@@ -404,32 +404,33 @@ export default function RuntimeControlPage() {
                 }
                 
                 // Update thought status and current step
-                trackedThought.status = thought.status;
-                trackedThought.current_step = thought.current_step;
-                trackedThought.last_updated = update.timestamp || new Date().toISOString();
-                trackedThought.steps_completed = thought.steps_completed;
-                trackedThought.steps_remaining = thought.steps_remaining;
+                if (trackedThought) {
+                  trackedThought.status = thought.status;
+                  trackedThought.current_step = thought.current_step;
+                  trackedThought.last_updated = update.timestamp || new Date().toISOString();
+                  trackedThought.steps_completed = thought.steps_completed;
+                  trackedThought.steps_remaining = thought.steps_remaining;
                 
-                // If thought is completed, ensure all 9 core steps are marked as completed
-                if (thought.status === 'completed' || thought.status === 'complete') {
-                  console.log('✅ Thought completed, ensuring all core steps are tracked');
-                  const coreSteps = [
-                    H3EREStepPoint.START_ROUND,
-                    H3EREStepPoint.GATHER_CONTEXT,
-                    H3EREStepPoint.PERFORM_DMAS,
-                    H3EREStepPoint.PERFORM_ASPDMA,
-                    H3EREStepPoint.CONSCIENCE_EXECUTION,
-                    H3EREStepPoint.FINALIZE_ACTION,
-                    H3EREStepPoint.PERFORM_ACTION,
-                    H3EREStepPoint.ACTION_COMPLETE,
-                    H3EREStepPoint.ROUND_COMPLETE
-                  ];
-                  
-                  coreSteps.forEach(step => {
-                    if (!trackedThought.steps.has(step)) {
-                      trackedThought.steps.set(step, {
-                        step_point: step,
-                        step_name: step.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                  // If thought is completed, ensure all 9 core steps are marked as completed
+                  if (thought.status === 'completed' || thought.status === 'complete') {
+                    console.log('✅ Thought completed, ensuring all core steps are tracked');
+                    const coreSteps = [
+                      H3EREStepPoint.START_ROUND,
+                      H3EREStepPoint.GATHER_CONTEXT,
+                      H3EREStepPoint.PERFORM_DMAS,
+                      H3EREStepPoint.PERFORM_ASPDMA,
+                      H3EREStepPoint.CONSCIENCE_EXECUTION,
+                      H3EREStepPoint.FINALIZE_ACTION,
+                      H3EREStepPoint.PERFORM_ACTION,
+                      H3EREStepPoint.ACTION_COMPLETE,
+                      H3EREStepPoint.ROUND_COMPLETE
+                    ];
+                    
+                    coreSteps.forEach(step => {
+                      if (!trackedThought.steps.has(step)) {
+                        trackedThought.steps.set(step, {
+                          step_point: step,
+                          step_name: step.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
                         step_category: 'inferred',
                         timestamp: update.timestamp || new Date().toISOString(),
                         status: 'completed',
@@ -438,6 +439,7 @@ export default function RuntimeControlPage() {
                       console.log(`➕ Added inferred completed step: ${step}`);
                     }
                   });
+                  }
                 }
                 
                 // Check if there's a completed_steps array we should process
