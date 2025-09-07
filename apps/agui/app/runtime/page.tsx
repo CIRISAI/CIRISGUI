@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cirisClient } from '../../lib/ciris-sdk';
 import { useAuth } from '../../contexts/AuthContext';
@@ -38,6 +38,45 @@ interface StreamStepData {
   timestamp: string;
 }
 
+// Thought tracking interfaces
+interface ThoughtStep {
+  step_point: H3EREStepPoint;
+  step_name: string;
+  step_category: string;
+  timestamp: string;
+  processing_time_ms?: number;
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'blocked';
+  content_preview?: string;
+  error?: string;
+  step_result?: any;  // Store the full step result
+  transparency_data?: any;  // Store transparency data
+  progress_percentage?: number;
+  round_number?: number;
+  stream_sequence?: number;  // Track which update this came from
+}
+
+interface TrackedThought {
+  thought_id: string;
+  task_id: string;
+  thought_type: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'blocked';
+  current_step?: H3EREStepPoint;
+  steps: Map<H3EREStepPoint, ThoughtStep>;
+  started_at?: string;
+  completed_at?: string;
+  total_processing_time_ms?: number;
+  last_updated: string;
+  steps_completed?: string[];  // Track completed step names
+  steps_remaining?: string[];  // Track remaining step names
+}
+
+interface TrackedTask {
+  task_id: string;
+  thoughts: Map<string, TrackedThought>;
+  created_at: string;
+  last_updated: string;
+}
+
 export default function RuntimeControlPage() {
   const { hasRole } = useAuth();
   const queryClient = useQueryClient();
@@ -56,6 +95,11 @@ export default function RuntimeControlPage() {
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Task and thought tracking state
+  const [trackedTasks, setTrackedTasks] = useState<Map<string, TrackedTask>>(new Map());
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
 
   // Fetch runtime state
   const { data: runtimeState, refetch: refetchRuntimeState } = useQuery({
@@ -206,11 +250,18 @@ export default function RuntimeControlPage() {
         }
         
         // Process the stream
+        let eventType = '';
+        let eventData = '';
+        
         while (true) {
           const { done, value } = await reader.read();
           
           if (done) {
             console.log('Stream ended');
+            // Process any remaining buffered event
+            if (eventType && eventData) {
+              processSSEEvent(eventType, eventData);
+            }
             break;
           }
           
@@ -221,20 +272,27 @@ export default function RuntimeControlPage() {
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
           
-          let eventType = '';
-          let eventData = '';
-          
           for (const line of lines) {
             if (line.startsWith('event:')) {
+              // If we have a pending event, process it first
+              if (eventType && eventData) {
+                processSSEEvent(eventType, eventData);
+              }
               eventType = line.slice(6).trim();
-            } else if (line.startsWith('data:')) {
-              eventData = line.slice(5).trim();
-            } else if (line === '' && eventType) {
-              // Process the event
-              processSSEEvent(eventType, eventData);
-              eventType = '';
               eventData = '';
+            } else if (line.startsWith('data:')) {
+              // SSE can have multi-line data, append if we already have some
+              const newData = line.slice(5).trim();
+              eventData = eventData ? eventData + '\n' + newData : newData;
+            } else if (line === '') {
+              // Empty line signals end of event
+              if (eventType && eventData) {
+                processSSEEvent(eventType, eventData);
+                eventType = '';
+                eventData = '';
+              }
             }
+            // Ignore other lines (comments, etc.)
           }
         }
       } catch (error: any) {
@@ -248,29 +306,339 @@ export default function RuntimeControlPage() {
     
     // Function to process SSE events
     const processSSEEvent = (eventType: string, eventData: string) => {
+      console.log(`🎯 SSE Event received - Type: ${eventType}, Data length: ${eventData.length}`);
+      
       try {
         if (eventType === 'connected') {
           console.log('✅ Stream connected:', eventData);
           setStreamConnected(true);
           setStreamError(null);
         } else if (eventType === 'step_update') {
-          const stepData: StreamStepData = JSON.parse(eventData);
-          console.log('📊 Step update received');
+          const update = JSON.parse(eventData);
+          console.log('📊 Step update received:', {
+            thoughtCount: update.updated_thoughts?.length || 0,
+            sequence: update.stream_sequence,
+            updateType: update.update_type,
+            fullUpdate: update  // Log the entire update to see all fields
+          });
           
-          setStreamData(prev => [...prev.slice(-99), stepData]);
-          
-          if (stepData.step_point) {
-            setCurrentStepPoint(stepData.step_point);
-          }
-          if (stepData.step_result) {
-            setLastStepResult(stepData.step_result);
-          }
-          if (stepData.processing_time_ms || stepData.tokens_used) {
-            setLastStepMetrics({
-              processing_time_ms: stepData.processing_time_ms,
-              tokens_used: stepData.tokens_used
+          // Process thoughts and steps from the update
+          if (update.updated_thoughts && Array.isArray(update.updated_thoughts)) {
+            setTrackedTasks(prevTasks => {
+              const newTasks = new Map(prevTasks);
+              
+              // First, we need to find if this thought already exists in any task
+              update.updated_thoughts.forEach((thought: any) => {
+                const thoughtId = thought.thought_id;
+                let taskId = thought.task_id || '';
+                
+                // Debug log to see the thought structure
+                console.log('🔍 Full thought data:', thought);  // Log entire thought object
+                console.log('📝 Thought summary:', {
+                  id: thoughtId,
+                  task_id: taskId,
+                  current_step: thought.current_step,
+                  steps_completed: thought.steps_completed,
+                  steps_remaining: thought.steps_remaining,
+                  progress: thought.progress_percentage,
+                  all_fields: Object.keys(thought).join(', ')  // Show all fields present
+                });
+                
+                // Check if this thought already exists in any task
+                let existingTask = null;
+                let existingThought = null;
+                
+                for (const [tid, task] of newTasks.entries()) {
+                  if (task.thoughts.has(thoughtId)) {
+                    existingTask = task;
+                    existingThought = task.thoughts.get(thoughtId);
+                    // If we found the thought in an existing task, use that task's ID
+                    // unless we have a valid task_id in the current update
+                    if (!taskId || taskId === 'unknown') {
+                      taskId = tid;
+                    } else if (taskId !== tid && tid !== 'unknown') {
+                      // Move the thought to the correct task if task_id changed
+                      task.thoughts.delete(thoughtId);
+                      if (task.thoughts.size === 0) {
+                        newTasks.delete(tid);
+                      }
+                    }
+                    break;
+                  }
+                }
+                
+                // If no task_id provided and thought doesn't exist, generate one
+                if (!taskId) {
+                  taskId = 'unknown';
+                }
+                
+                // Get or create task
+                let task = newTasks.get(taskId);
+                if (!task) {
+                  task = {
+                    task_id: taskId,
+                    thoughts: new Map(),
+                    created_at: update.timestamp || new Date().toISOString(),
+                    last_updated: update.timestamp || new Date().toISOString()
+                  };
+                  newTasks.set(taskId, task);
+                }
+                
+                // Get or create thought (may have been moved from another task)
+                let trackedThought = task.thoughts.get(thoughtId) || existingThought;
+                if (!trackedThought) {
+                  trackedThought = {
+                    thought_id: thoughtId,
+                    task_id: taskId,
+                    thought_type: thought.thought_type || 'unknown',
+                    status: thought.status,
+                    current_step: thought.current_step,
+                    steps: new Map(),
+                    started_at: thought.started_at,
+                    last_updated: update.timestamp || new Date().toISOString()
+                  };
+                  task.thoughts.set(thoughtId, trackedThought);
+                } else {
+                  // Move the thought to the current task if needed
+                  task.thoughts.set(thoughtId, trackedThought);
+                }
+                
+                // Update thought status and current step
+                trackedThought.status = thought.status;
+                trackedThought.current_step = thought.current_step;
+                trackedThought.last_updated = update.timestamp || new Date().toISOString();
+                trackedThought.steps_completed = thought.steps_completed;
+                trackedThought.steps_remaining = thought.steps_remaining;
+                
+                // If thought is completed, ensure all 9 core steps are marked as completed
+                if (thought.status === 'completed' || thought.status === 'complete') {
+                  console.log('✅ Thought completed, ensuring all core steps are tracked');
+                  const coreSteps = [
+                    H3EREStepPoint.START_ROUND,
+                    H3EREStepPoint.GATHER_CONTEXT,
+                    H3EREStepPoint.PERFORM_DMAS,
+                    H3EREStepPoint.PERFORM_ASPDMA,
+                    H3EREStepPoint.CONSCIENCE_EXECUTION,
+                    H3EREStepPoint.FINALIZE_ACTION,
+                    H3EREStepPoint.PERFORM_ACTION,
+                    H3EREStepPoint.ACTION_COMPLETE,
+                    H3EREStepPoint.ROUND_COMPLETE
+                  ];
+                  
+                  coreSteps.forEach(step => {
+                    if (!trackedThought.steps.has(step)) {
+                      trackedThought.steps.set(step, {
+                        step_point: step,
+                        step_name: step.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                        step_category: 'inferred',
+                        timestamp: update.timestamp || new Date().toISOString(),
+                        status: 'completed',
+                        content_preview: 'Step completed (inferred from thought completion)'
+                      });
+                      console.log(`➕ Added inferred completed step: ${step}`);
+                    }
+                  });
+                }
+                
+                // Check if there's a completed_steps array we should process
+                if (thought.completed_steps && Array.isArray(thought.completed_steps)) {
+                  console.log('📋 Found completed_steps array:', thought.completed_steps);
+                  thought.completed_steps.forEach((completedStep: any) => {
+                    const stepEnum = completedStep.toUpperCase().replace(/ /g, '_') as H3EREStepPoint;
+                    if (!trackedThought.steps.has(stepEnum)) {
+                      trackedThought.steps.set(stepEnum, {
+                        step_point: stepEnum,
+                        step_name: completedStep.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                        step_category: 'completed',
+                        timestamp: update.timestamp || new Date().toISOString(),
+                        status: 'completed',
+                      });
+                      console.log(`📋 Added completed step from array: ${stepEnum}`);
+                    }
+                  });
+                }
+                
+                // Also check for step_history or pipeline_steps
+                if (thought.step_history && Array.isArray(thought.step_history)) {
+                  console.log('📜 Found step_history:', thought.step_history);
+                  thought.step_history.forEach((stepInfo: any) => {
+                    const stepEnum = (stepInfo.step_name || stepInfo.step || stepInfo).toUpperCase().replace(/ /g, '_') as H3EREStepPoint;
+                    if (!trackedThought.steps.has(stepEnum) && Object.values(H3EREStepPoint).includes(stepEnum)) {
+                      trackedThought.steps.set(stepEnum, {
+                        step_point: stepEnum,
+                        step_name: (stepInfo.step_name || stepInfo.step || stepInfo).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                        step_category: stepInfo.category || 'historical',
+                        timestamp: stepInfo.timestamp || update.timestamp || new Date().toISOString(),
+                        status: stepInfo.status || 'completed',
+                        processing_time_ms: stepInfo.processing_time_ms,
+                        content_preview: stepInfo.content_preview,
+                        step_result: stepInfo.result
+                      });
+                      console.log(`📜 Added step from history: ${stepEnum}`);
+                    }
+                  });
+                }
+                
+                // Check for pipeline_steps
+                if (thought.pipeline_steps && typeof thought.pipeline_steps === 'object') {
+                  console.log('🔧 Found pipeline_steps:', thought.pipeline_steps);
+                  Object.entries(thought.pipeline_steps).forEach(([stepName, stepData]: [string, any]) => {
+                    const stepEnum = stepName.toUpperCase().replace(/ /g, '_') as H3EREStepPoint;
+                    if (!trackedThought.steps.has(stepEnum) && Object.values(H3EREStepPoint).includes(stepEnum)) {
+                      trackedThought.steps.set(stepEnum, {
+                        step_point: stepEnum,
+                        step_name: stepName.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                        step_category: stepData.category || 'pipeline',
+                        timestamp: stepData.timestamp || update.timestamp || new Date().toISOString(),
+                        status: stepData.status || 'completed',
+                        processing_time_ms: stepData.processing_time_ms,
+                        content_preview: stepData.content_preview,
+                        step_result: stepData.result,
+                        transparency_data: stepData.transparency_data
+                      });
+                      console.log(`🔧 Added step from pipeline: ${stepEnum}`);
+                    }
+                  });
+                }
+                
+                // Map current step name to enum - handle different formats
+                let currentStepEnum: H3EREStepPoint | undefined;
+                if (thought.current_step) {
+                  // Try direct mapping first
+                  currentStepEnum = thought.current_step as H3EREStepPoint;
+                  
+                  // If not a valid enum value, try converting format
+                  if (!Object.values(H3EREStepPoint).includes(currentStepEnum)) {
+                    currentStepEnum = thought.current_step.toUpperCase().replace(/ /g, '_') as H3EREStepPoint;
+                  }
+                  
+                  console.log('🎯 Step mapping:', {
+                    original: thought.current_step,
+                    mapped: currentStepEnum,
+                    isValidEnum: Object.values(H3EREStepPoint).includes(currentStepEnum)
+                  });
+                }
+                
+                // ALWAYS update the current step with the latest data from this update
+                if (currentStepEnum && Object.values(H3EREStepPoint).includes(currentStepEnum)) {
+                  // Store or update the step with ALL the unique data from this update
+                  const stepData: ThoughtStep = {
+                    step_point: currentStepEnum,
+                    step_name: thought.current_step.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                    step_category: thought.step_category || 'unknown',
+                    timestamp: thought.current_step_started_at || update.timestamp || new Date().toISOString(),
+                    status: thought.status || 'processing',
+                    processing_time_ms: thought.processing_time_ms,
+                    content_preview: thought.content_preview,
+                    error: thought.last_error,
+                    step_result: thought.step_result,
+                    transparency_data: thought.transparency_data,
+                    progress_percentage: thought.progress_percentage,
+                    round_number: thought.round_number,
+                    stream_sequence: update.stream_sequence
+                  };
+                  
+                  // Store this step data
+                  trackedThought.steps.set(currentStepEnum, stepData);
+                  console.log(`✅ Stored step ${currentStepEnum}, total steps: ${trackedThought.steps.size}`);
+                  
+                  // Trigger animation for this step
+                  setCurrentStepPoint(currentStepEnum);
+                  
+                  // Also check if we need to mark previous steps as completed
+                  const coreSteps = [
+                    H3EREStepPoint.START_ROUND,
+                    H3EREStepPoint.GATHER_CONTEXT,
+                    H3EREStepPoint.PERFORM_DMAS,
+                    H3EREStepPoint.PERFORM_ASPDMA,
+                    H3EREStepPoint.CONSCIENCE_EXECUTION,
+                    H3EREStepPoint.FINALIZE_ACTION,
+                    H3EREStepPoint.PERFORM_ACTION,
+                    H3EREStepPoint.ACTION_COMPLETE,
+                    H3EREStepPoint.ROUND_COMPLETE
+                  ];
+                  
+                  // Find the index of the current step
+                  const currentStepIndex = coreSteps.indexOf(currentStepEnum);
+                  console.log(`📍 Current step index: ${currentStepIndex} of ${coreSteps.length}`);
+                  
+                  // Mark previous steps as completed if we haven't seen them yet
+                  if (currentStepIndex > 0) {
+                    for (let i = 0; i < currentStepIndex; i++) {
+                      const prevStep = coreSteps[i];
+                      if (!trackedThought.steps.has(prevStep)) {
+                        // This step was completed but we didn't see its update
+                        trackedThought.steps.set(prevStep, {
+                          step_point: prevStep,
+                          step_name: prevStep.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                          step_category: 'completed',
+                          timestamp: update.timestamp || new Date().toISOString(),
+                          status: 'completed',
+                        });
+                        console.log(`⏮️ Backfilled completed step: ${prevStep}`);
+                      }
+                    }
+                  }
+                  
+                  // Also infer completed steps based on steps_remaining count
+                  if (thought.steps_remaining && Array.isArray(thought.steps_remaining)) {
+                    const remainingCount = thought.steps_remaining.length;
+                    const totalSteps = 9; // Always 9 core steps
+                    const completedCount = totalSteps - remainingCount;
+                    
+                    console.log(`📊 Steps progress: ${completedCount} completed, ${remainingCount} remaining`);
+                    
+                    // Mark the first N steps as completed based on count
+                    for (let i = 0; i < completedCount && i < coreSteps.length; i++) {
+                      const step = coreSteps[i];
+                      if (!trackedThought.steps.has(step)) {
+                        trackedThought.steps.set(step, {
+                          step_point: step,
+                          step_name: step.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                          step_category: 'inferred',
+                          timestamp: update.timestamp || new Date().toISOString(),
+                          status: 'completed',
+                          content_preview: 'Step completed (inferred from remaining count)'
+                        });
+                        console.log(`📊 Inferred completed step from count: ${step}`);
+                      }
+                    }
+                  }
+                  
+                  // Handle recursive steps specially
+                  if (currentStepEnum === H3EREStepPoint.RECURSIVE_ASPDMA || 
+                      currentStepEnum === H3EREStepPoint.RECURSIVE_CONSCIENCE) {
+                    // Make sure CONSCIENCE_EXECUTION is marked as completed (it failed, triggering recursion)
+                    const conscienceStep = trackedThought.steps.get(H3EREStepPoint.CONSCIENCE_EXECUTION);
+                    if (conscienceStep && conscienceStep.status !== 'completed') {
+                      conscienceStep.status = 'completed';
+                      conscienceStep.error = 'Conscience check failed - triggered recursive analysis';
+                    }
+                  }
+                }
+                
+                
+                // Update total processing time
+                if (thought.total_processing_time_ms) {
+                  trackedThought.total_processing_time_ms = thought.total_processing_time_ms;
+                }
+                
+                // Update task last_updated
+                task.last_updated = update.timestamp || new Date().toISOString();
+              });
+              
+              return newTasks;
             });
           }
+          
+          // Store raw stream data for backward compatibility
+          const stepData: StreamStepData = {
+            timestamp: update.timestamp || new Date().toISOString(),
+            step_point: update.current_step,
+            pipeline_state: update
+          };
+          setStreamData(prev => [...prev.slice(-99), stepData]);
+          
         } else if (eventType === 'keepalive') {
           console.log('💓 Keepalive:', eventData);
         } else if (eventType === 'error') {
@@ -295,14 +663,56 @@ export default function RuntimeControlPage() {
     };
   }, []);
 
+  // Track animated steps
+  const [animatedSteps, setAnimatedSteps] = useState<Set<number>>(new Set());
+  
+  // Map H3ERE step points to SVG number IDs (1-indexed)
+  const stepToNumber: Record<H3EREStepPoint, number> = {
+    [H3EREStepPoint.START_ROUND]: 1,
+    [H3EREStepPoint.GATHER_CONTEXT]: 2,
+    [H3EREStepPoint.PERFORM_DMAS]: 3,
+    [H3EREStepPoint.PERFORM_ASPDMA]: 4,
+    [H3EREStepPoint.CONSCIENCE_EXECUTION]: 5,
+    [H3EREStepPoint.FINALIZE_ACTION]: 6,
+    [H3EREStepPoint.PERFORM_ACTION]: 7,
+    [H3EREStepPoint.ACTION_COMPLETE]: 8,
+    [H3EREStepPoint.ROUND_COMPLETE]: 9,
+    [H3EREStepPoint.RECURSIVE_ASPDMA]: 10,
+    [H3EREStepPoint.RECURSIVE_CONSCIENCE]: 11,
+  };
+  
+  // Function to animate a step without blocking
+  const animateStep = useCallback((step: H3EREStepPoint) => {
+    const stepNumber = stepToNumber[step];
+    if (stepNumber) {
+      // Delay ROUND_COMPLETE to ensure it animates after ACTION_COMPLETE
+      const delay = step === H3EREStepPoint.ROUND_COMPLETE ? 300 : 0;
+      
+      setTimeout(() => {
+        // Use requestAnimationFrame to avoid blocking
+        requestAnimationFrame(() => {
+          setAnimatedSteps(prev => new Set([...prev, stepNumber]));
+          
+          // Remove animation after 0.2 seconds
+          setTimeout(() => {
+            setAnimatedSteps(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(stepNumber);
+              return newSet;
+            });
+          }, 200);
+        });
+      }, delay);
+    }
+  }, []);
+  
   // Visual step indicators for SVG highlighting
   useEffect(() => {
     if (currentStepPoint) {
-      // Add visual highlighting to SVG components based on current step
-      // This will be enhanced once we identify specific SVG elements to highlight
       console.log('Current step:', currentStepPoint);
+      animateStep(currentStepPoint);
     }
-  }, [currentStepPoint]);
+  }, [currentStepPoint, animateStep]);
 
   const isPaused = processorState === 'paused';
   const isRunning = processorState === 'running';
@@ -458,19 +868,92 @@ export default function RuntimeControlPage() {
           
           {/* SVG Container with responsive sizing */}
           <div className="w-full overflow-x-auto">
-            <div className="min-w-[800px] bg-gray-50 rounded-lg p-4">
-              <object 
-                data="/ciris-architecture.svg" 
-                type="image/svg+xml" 
-                className="w-full h-[600px]"
-                style={{ maxWidth: '100%', height: 'auto' }}
-              >
-                <img 
-                  src="/ciris-architecture.svg" 
-                  alt="CIRIS Architecture Diagram" 
-                  className="w-full h-auto"
-                />
-              </object>
+            <div className="min-w-[1200px] bg-gray-50 rounded-lg p-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="150" viewBox="0 0 1200 150">
+                <title>H3ERE Pipeline Steps 1-11</title>
+                
+                {/* Render each number with appropriate color */}
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(num => {
+                  const isAnimated = animatedSteps.has(num);
+                  const strokeColor = isAnimated ? '#10b981' : '#000';
+                  const segStyle = { 
+                    stroke: strokeColor, 
+                    strokeWidth: 8, 
+                    strokeLinecap: 'round' as const, 
+                    fill: 'none',
+                    transition: 'stroke 0.3s ease'
+                  };
+                  
+                  // Define which segments are active for each number
+                  const segments: Record<number, string[]> = {
+                    1: ['b', 'c'],
+                    2: ['a', 'b', 'd', 'e', 'g'],
+                    3: ['a', 'b', 'c', 'd', 'g'],
+                    4: ['b', 'c', 'f', 'g'],
+                    5: ['a', 'c', 'd', 'f', 'g'],
+                    6: ['a', 'c', 'd', 'e', 'f', 'g'],
+                    7: ['a', 'b', 'c'],
+                    8: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+                    9: ['a', 'b', 'c', 'd', 'f', 'g'],
+                  };
+                  
+                  // Helper to draw a segment
+                  const drawSegment = (seg: string, offsetX: number = 0) => {
+                    const segCoords: Record<string, [number, number, number, number]> = {
+                      a: [10, 10, 40, 10],
+                      b: [40, 10, 40, 40],
+                      c: [40, 40, 40, 70],
+                      d: [10, 70, 40, 70],
+                      e: [10, 40, 10, 70],
+                      f: [10, 10, 10, 40],
+                      g: [10, 40, 40, 40],
+                    };
+                    const [x1, y1, x2, y2] = segCoords[seg];
+                    return (
+                      <line 
+                        key={`${num}-${seg}-${offsetX}`}
+                        x1={x1 + offsetX} 
+                        y1={y1} 
+                        x2={x2 + offsetX} 
+                        y2={y2} 
+                        style={segStyle}
+                      />
+                    );
+                  };
+                  
+                  // Handle single digit numbers (1-9)
+                  if (num < 10) {
+                    return (
+                      <g key={num} transform={`translate(${(num - 1) * 100},35)`}>
+                        {segments[num].map(seg => drawSegment(seg))}
+                      </g>
+                    );
+                  }
+                  
+                  // Handle double digit numbers (10, 11)
+                  if (num === 10) {
+                    return (
+                      <g key={num} transform="translate(900,35)">
+                        {/* "1" */}
+                        {segments[1].map(seg => drawSegment(seg, 0))}
+                        {/* "0" - all segments except g */}
+                        {['a', 'b', 'c', 'd', 'e', 'f'].map(seg => drawSegment(seg, 60))}
+                      </g>
+                    );
+                  }
+                  
+                  if (num === 11) {
+                    return (
+                      <g key={num} transform="translate(1050,35)">
+                        {/* First "1" */}
+                        {segments[1].map(seg => drawSegment(seg, 0))}
+                        {/* Second "1" */}
+                        {segments[1].map(seg => drawSegment(seg, 60))}
+                      </g>
+                    );
+                  }
+                })}
+              </svg>
             </div>
           </div>
 
@@ -552,6 +1035,195 @@ export default function RuntimeControlPage() {
         </div>
       )}
 
+
+      {/* Task/Thought/Step Tracking Table */}
+      {trackedTasks.size > 0 && (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Task & Thought Pipeline Tracking
+          </h2>
+          
+          <div className="space-y-4">
+            {Array.from(trackedTasks.entries()).map(([taskId, task]) => (
+              <div key={taskId} className="border border-gray-200 rounded-lg">
+                {/* Task Header */}
+                <div 
+                  className="px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => {
+                    setExpandedTasks(prev => {
+                      const next = new Set(prev);
+                      if (next.has(taskId)) {
+                        next.delete(taskId);
+                      } else {
+                        next.add(taskId);
+                      }
+                      return next;
+                    });
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-gray-400">
+                        {expandedTasks.has(taskId) ? '▼' : '▶'}
+                      </span>
+                      <span className="font-medium text-gray-900">
+                        Task: {taskId === 'unknown' ? 'System Task' : taskId.substring(0, 12) + '...'}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        ({task.thoughts.size} thought{task.thoughts.size !== 1 ? 's' : ''})
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      Updated: {new Date(task.last_updated).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Thoughts for this Task */}
+                {expandedTasks.has(taskId) && (
+                  <div className="border-t border-gray-200">
+                    {Array.from(task.thoughts.entries()).map(([thoughtId, thought]) => (
+                      <div key={thoughtId} className="border-b border-gray-100 last:border-b-0">
+                        {/* Thought Header */}
+                        <div 
+                          className="px-6 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => {
+                            setExpandedThoughts(prev => {
+                              const next = new Set(prev);
+                              if (next.has(thoughtId)) {
+                                next.delete(thoughtId);
+                              } else {
+                                next.add(thoughtId);
+                              }
+                              return next;
+                            });
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <span className="text-gray-400 text-sm">
+                                {expandedThoughts.has(thoughtId) ? '▼' : '▶'}
+                              </span>
+                              <span className="text-sm font-medium text-gray-700">
+                                {thought.thought_id.substring(0, 20)}...
+                              </span>
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                thought.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                thought.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                                thought.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                thought.status === 'blocked' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {thought.status}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Type: {thought.thought_type}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                Steps: {thought.steps.size}/11
+                              </span>
+                            </div>
+                            {thought.total_processing_time_ms && (
+                              <span className="text-xs text-gray-500">
+                                Total: {thought.total_processing_time_ms.toFixed(1)}ms
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Steps for this Thought */}
+                        {expandedThoughts.has(thoughtId) && thought.steps.size > 0 && (
+                          <div className="px-8 py-3 bg-gray-50">
+                            <div className="space-y-2">
+                              <div className="text-xs font-semibold text-gray-600 mb-2">
+                                Pipeline Steps (in order):
+                              </div>
+                              {Array.from(thought.steps.entries())
+                                .sort(([a], [b]) => {
+                                  const order = Object.values(H3EREStepPoint);
+                                  return order.indexOf(a as any) - order.indexOf(b as any);
+                                })
+                                .map(([stepPoint, step]) => (
+                                  <div key={stepPoint} className="flex items-start space-x-3 text-xs">
+                                    <div className="flex-shrink-0 w-32">
+                                      <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                                        step.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                        step.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                                        step.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {step.step_name}
+                                      </span>
+                                    </div>
+                                    <div className="flex-1 space-y-1">
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-gray-500">
+                                          Category: {step.step_category}
+                                        </span>
+                                        {step.processing_time_ms && (
+                                          <span className="text-gray-500">
+                                            • {step.processing_time_ms.toFixed(1)}ms
+                                          </span>
+                                        )}
+                                        {step.progress_percentage !== undefined && (
+                                          <span className="text-gray-500">
+                                            • {step.progress_percentage.toFixed(1)}%
+                                          </span>
+                                        )}
+                                        {step.stream_sequence !== undefined && (
+                                          <span className="text-gray-400">
+                                            • Seq: {step.stream_sequence}
+                                          </span>
+                                        )}
+                                        <span className="text-gray-400">
+                                          • {new Date(step.timestamp).toLocaleTimeString()}
+                                        </span>
+                                      </div>
+                                      {step.content_preview && (
+                                        <div className="text-gray-600 italic">
+                                          "{step.content_preview}"
+                                        </div>
+                                      )}
+                                      {step.step_result && (
+                                        <details className="text-xs">
+                                          <summary className="cursor-pointer text-blue-600 hover:text-blue-800">
+                                            Step Result Data
+                                          </summary>
+                                          <pre className="mt-1 p-2 bg-gray-100 rounded overflow-x-auto">
+                                            {JSON.stringify(step.step_result, null, 2)}
+                                          </pre>
+                                        </details>
+                                      )}
+                                      {step.transparency_data && (
+                                        <details className="text-xs">
+                                          <summary className="cursor-pointer text-purple-600 hover:text-purple-800">
+                                            Transparency Data
+                                          </summary>
+                                          <pre className="mt-1 p-2 bg-purple-50 rounded overflow-x-auto">
+                                            {JSON.stringify(step.transparency_data, null, 2)}
+                                          </pre>
+                                        </details>
+                                      )}
+                                      {step.error && (
+                                        <div className="text-red-600">
+                                          Error: {step.error}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Instructions */}
       <div className="bg-blue-50 rounded-lg p-4">
