@@ -441,14 +441,14 @@ export default function RuntimeControlPage() {
                 }
                 
                 // Check if there's a completed_steps array we should process
-                if (thought.completed_steps && Array.isArray(thought.completed_steps)) {
+                if (thought.completed_steps && Array.isArray(thought.completed_steps) && trackedThought) {
                   console.log('📋 Found completed_steps array:', thought.completed_steps);
                   thought.completed_steps.forEach((completedStep: any) => {
                     const stepEnum = completedStep.toUpperCase().replace(/ /g, '_') as H3EREStepPoint;
                     if (!trackedThought.steps.has(stepEnum)) {
                       trackedThought.steps.set(stepEnum, {
                         step_point: stepEnum,
-                        step_name: completedStep.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                        step_name: completedStep.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
                         step_category: 'completed',
                         timestamp: update.timestamp || new Date().toISOString(),
                         status: 'completed',
@@ -459,14 +459,14 @@ export default function RuntimeControlPage() {
                 }
                 
                 // Also check for step_history or pipeline_steps
-                if (thought.step_history && Array.isArray(thought.step_history)) {
+                if (thought.step_history && Array.isArray(thought.step_history) && trackedThought) {
                   console.log('📜 Found step_history:', thought.step_history);
                   thought.step_history.forEach((stepInfo: any) => {
                     const stepEnum = (stepInfo.step_name || stepInfo.step || stepInfo).toUpperCase().replace(/ /g, '_') as H3EREStepPoint;
                     if (!trackedThought.steps.has(stepEnum) && Object.values(H3EREStepPoint).includes(stepEnum)) {
                       trackedThought.steps.set(stepEnum, {
                         step_point: stepEnum,
-                        step_name: (stepInfo.step_name || stepInfo.step || stepInfo).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                        step_name: (stepInfo.step_name || stepInfo.step || stepInfo).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
                         step_category: stepInfo.category || 'historical',
                         timestamp: stepInfo.timestamp || update.timestamp || new Date().toISOString(),
                         status: stepInfo.status || 'completed',
@@ -480,14 +480,14 @@ export default function RuntimeControlPage() {
                 }
                 
                 // Check for pipeline_steps
-                if (thought.pipeline_steps && typeof thought.pipeline_steps === 'object') {
+                if (thought.pipeline_steps && typeof thought.pipeline_steps === 'object' && trackedThought) {
                   console.log('🔧 Found pipeline_steps:', thought.pipeline_steps);
                   Object.entries(thought.pipeline_steps).forEach(([stepName, stepData]: [string, any]) => {
                     const stepEnum = stepName.toUpperCase().replace(/ /g, '_') as H3EREStepPoint;
                     if (!trackedThought.steps.has(stepEnum) && Object.values(H3EREStepPoint).includes(stepEnum)) {
                       trackedThought.steps.set(stepEnum, {
                         step_point: stepEnum,
-                        step_name: stepName.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                        step_name: stepName.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
                         step_category: stepData.category || 'pipeline',
                         timestamp: stepData.timestamp || update.timestamp || new Date().toISOString(),
                         status: stepData.status || 'completed',
@@ -524,7 +524,7 @@ export default function RuntimeControlPage() {
                   // Store or update the step with ALL the unique data from this update
                   const stepData: ThoughtStep = {
                     step_point: currentStepEnum,
-                    step_name: thought.current_step.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+                    step_name: thought.current_step.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
                     step_category: thought.step_category || 'unknown',
                     timestamp: thought.current_step_started_at || update.timestamp || new Date().toISOString(),
                     status: thought.status || 'processing',
