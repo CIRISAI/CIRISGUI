@@ -55,7 +55,7 @@ export default function RuntimeControlPage() {
   const [streamData, setStreamData] = useState<StreamStepData[]>([]);
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Fetch runtime state
   const { data: runtimeState, refetch: refetchRuntimeState } = useQuery({
@@ -168,70 +168,130 @@ export default function RuntimeControlPage() {
     }
 
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-    const streamUrl = `${apiBaseUrl}/v1/system/runtime/reasoning-stream?token=${encodeURIComponent(token)}`;
+    const streamUrl = `${apiBaseUrl}/v1/system/runtime/reasoning-stream`;
     
     console.log('🔌 Connecting to reasoning stream:', streamUrl);
+    console.log('Token being used:', token.substring(0, 20) + '...');
     
-    const eventSource = new EventSource(streamUrl);
+    // Create abort controller for cleanup
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
     
-    eventSourceRef.current = eventSource;
-
-    eventSource.addEventListener('connected', (event) => {
-      console.log('✅ Stream connected:', (event as MessageEvent).data);
-      setStreamConnected(true);
-      setStreamError(null);
-    });
-
-    eventSource.addEventListener('step_update', (event) => {
+    // Use fetch with proper headers instead of EventSource
+    const connectStream = async () => {
       try {
-        const stepData: StreamStepData = JSON.parse((event as MessageEvent).data);
-        console.log('📊 Step update received:', stepData);
+        const response = await fetch(streamUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'text/event-stream',
+          },
+          signal: abortController.signal,
+        });
         
-        setStreamData(prev => [...prev.slice(-99), stepData]); // Keep last 100 updates
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
-        if (stepData.step_point) {
-          setCurrentStepPoint(stepData.step_point);
+        console.log('✅ Stream response received');
+        setStreamConnected(true);
+        setStreamError(null);
+        
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        if (!reader) {
+          throw new Error('Response body is not readable');
         }
-        if (stepData.step_result) {
-          setLastStepResult(stepData.step_result);
+        
+        // Process the stream
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            console.log('Stream ended');
+            break;
+          }
+          
+          // Decode and buffer
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Process complete SSE events
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          let eventType = '';
+          let eventData = '';
+          
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              eventType = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+              eventData = line.slice(5).trim();
+            } else if (line === '' && eventType) {
+              // Process the event
+              processSSEEvent(eventType, eventData);
+              eventType = '';
+              eventData = '';
+            }
+          }
         }
-        if (stepData.processing_time_ms || stepData.tokens_used) {
-          setLastStepMetrics({
-            processing_time_ms: stepData.processing_time_ms,
-            tokens_used: stepData.tokens_used
-          });
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error('❌ Stream connection error:', error);
+          setStreamError(`Connection failed: ${error.message}`);
+          setStreamConnected(false);
+        }
+      }
+    };
+    
+    // Function to process SSE events
+    const processSSEEvent = (eventType: string, eventData: string) => {
+      try {
+        if (eventType === 'connected') {
+          console.log('✅ Stream connected:', eventData);
+          setStreamConnected(true);
+          setStreamError(null);
+        } else if (eventType === 'step_update') {
+          const stepData: StreamStepData = JSON.parse(eventData);
+          console.log('📊 Step update received');
+          
+          setStreamData(prev => [...prev.slice(-99), stepData]);
+          
+          if (stepData.step_point) {
+            setCurrentStepPoint(stepData.step_point);
+          }
+          if (stepData.step_result) {
+            setLastStepResult(stepData.step_result);
+          }
+          if (stepData.processing_time_ms || stepData.tokens_used) {
+            setLastStepMetrics({
+              processing_time_ms: stepData.processing_time_ms,
+              tokens_used: stepData.tokens_used
+            });
+          }
+        } else if (eventType === 'keepalive') {
+          console.log('💓 Keepalive:', eventData);
+        } else if (eventType === 'error') {
+          const errorData = JSON.parse(eventData);
+          console.error('❌ Stream error:', errorData);
+          setStreamError(`Stream error: ${errorData.message || 'Unknown error'}`);
         }
       } catch (error) {
-        console.error('❌ Error parsing step update:', error);
+        console.error('Failed to process event:', eventType, error);
       }
-    });
-
-    eventSource.addEventListener('keepalive', (event) => {
-      console.log('💓 Stream keepalive');
-    });
-
-    eventSource.addEventListener('error', (event) => {
-      try {
-        const errorData = JSON.parse((event as MessageEvent).data);
-        console.error('❌ Stream error:', errorData);
-        setStreamError(`Stream error: ${errorData.message || 'Unknown error'}`);
-      } catch {
-        console.error('❌ Stream connection error');
-        setStreamError('Stream connection failed');
-      }
-      setStreamConnected(false);
-    });
-
-    eventSource.onerror = (error) => {
-      console.error('❌ EventSource error:', error);
-      setStreamError('Connection lost - attempting to reconnect...');
-      setStreamConnected(false);
     };
+    
+    // Start the connection
+    connectStream();
+
+    // Events are now handled in processSSEEvent function above
 
     return () => {
       console.log('🔌 Closing stream connection');
-      eventSource.close();
-      eventSourceRef.current = null;
+      abortController.abort();
+      abortControllerRef.current = null;
     };
   }, []);
 

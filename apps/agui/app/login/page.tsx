@@ -15,6 +15,9 @@ export default function LoginPage() {
   const [error, setError] = useState<Error | null>(null);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(true);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const { login } = useAuth();
 
   // Always show Google and Discord OAuth options
   const oauthProviders = [
@@ -74,26 +77,52 @@ export default function LoginPage() {
       // Otherwise try standalone mode
       try {
         console.log('Trying standalone mode...');
-        // Configure SDK for standalone mode
-        cirisClient.setConfig({ baseURL: window.location.origin });
+        // Configure SDK for standalone mode - use env variable if available
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
+        cirisClient.setConfig({ baseURL: apiBaseUrl });
 
-        // Fetch real identity from the API
-        const identity = await cirisClient.agent.getIdentity();
+        // Try to fetch real identity from the API
+        try {
+          const identity = await cirisClient.agent.getIdentity();
+          
+          // Create agent info from real identity
+          const realAgent: AgentInfo = {
+            agent_id: identity.agent_id,
+            agent_name: identity.name,  // Real name from API!
+            container_name: 'standalone',
+            status: 'running',
+            api_endpoint: apiBaseUrl,
+            created_at: new Date().toISOString(),
+            update_available: false
+          };
 
-        // Create agent info from real identity
-        const realAgent: AgentInfo = {
-          agent_id: identity.agent_id,
-          agent_name: identity.name,  // Real name from API!
-          container_name: 'standalone',
-          status: 'running',
-          api_endpoint: window.location.origin,
-          created_at: new Date().toISOString(),
-          update_available: false
-        };
-
-        setAgents([realAgent]);
-        setSelectedAgent(realAgent.agent_id);
-        console.log('Standalone mode successful');
+          setAgents([realAgent]);
+          setSelectedAgent(realAgent.agent_id);
+          console.log('Standalone mode successful with identity');
+        } catch (identityError: any) {
+          // If we get a 401, the API is there but needs auth - create a default agent
+          if (identityError?.name === 'CIRISAuthError' || 
+              identityError?.status === 401 || 
+              identityError?.message?.includes('Authentication failed')) {
+            console.log('API requires authentication - using default agent');
+            const defaultAgent: AgentInfo = {
+              agent_id: 'datum',
+              agent_name: 'CIRIS Agent',
+              container_name: 'standalone',
+              status: 'running',
+              api_endpoint: apiBaseUrl,
+              created_at: new Date().toISOString(),
+              update_available: false
+            };
+            
+            setAgents([defaultAgent]);
+            setSelectedAgent(defaultAgent.agent_id);
+            console.log('Standalone mode ready for authentication');
+          } else {
+            // Some other error - rethrow
+            throw identityError;
+          }
+        }
       } catch (error) {
         console.error('Neither CIRISManager nor standalone API available:', error);
         setError(error instanceof Error ? error : new Error('No CIRIS infrastructure available'));
@@ -117,8 +146,8 @@ export default function LoginPage() {
         // Managed mode: use agent-specific API path
         baseURL = `${window.location.origin}/api/${agent.agent_id}`;
       } else {
-        // Standalone mode: direct API access
-        baseURL = window.location.origin;
+        // Standalone mode: direct API access - use env variable if available
+        baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
       }
 
       cirisClient.setConfig({ baseURL });
@@ -128,6 +157,31 @@ export default function LoginPage() {
       localStorage.setItem('selectedAgentName', agent.agent_name);
     }
   }, [selectedAgent, agents]);
+
+  const handleBasicLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Store selected agent for AuthContext
+      const agent = agents.find(a => a.agent_id === selectedAgent);
+      if (agent) {
+        localStorage.setItem('selectedAgentId', agent.agent_id);
+        localStorage.setItem('selectedAgentName', agent.agent_name);
+      }
+      
+      // Perform login
+      await login(username, password);
+      
+      // Login successful - AuthContext will handle the redirect
+    } catch (err: any) {
+      console.error('Login failed:', err);
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOAuthLogin = async (provider: string) => {
     try {
@@ -144,8 +198,9 @@ export default function LoginPage() {
         oauthUrl = `${window.location.origin}/api/${agent.agent_id}/v1/auth/oauth/${provider}/login`;
       } else {
         // Standalone mode: direct OAuth - still use dynamic route for consistency
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
         redirectUri = encodeURIComponent(`${window.location.origin}/oauth/${selectedAgent}/${provider}/callback`);
-        oauthUrl = `${window.location.origin}/v1/auth/oauth/${provider}/login`;
+        oauthUrl = `${apiBaseUrl}/v1/auth/oauth/${provider}/login`;
       }
 
       window.location.href = `${oauthUrl}?redirect_uri=${redirectUri}`;
@@ -263,6 +318,62 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
+
+          {/* Basic Auth Login Form - Show for local development */}
+          {agents.length > 0 && agents[0].container_name === 'standalone' && (
+            <form onSubmit={handleBasicLogin} className="space-y-4">
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+                  Username
+                </label>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  placeholder="Enter username"
+                  disabled={loading}
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  placeholder="Enter password"
+                  disabled={loading}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || !username || !password}
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Signing in...' : 'Sign in'}
+              </button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
+                </div>
+              </div>
+            </form>
+          )}
 
           {/* OAuth Login Options */}
           <div className="mt-6">
