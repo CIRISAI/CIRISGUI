@@ -426,9 +426,10 @@ export default function RuntimeControlPage() {
                       H3EREStepPoint.ROUND_COMPLETE
                     ];
                     
+                    const thoughtSteps = trackedThought.steps;  // Capture the reference
                     coreSteps.forEach(step => {
-                      if (!trackedThought.steps.has(step)) {
-                        trackedThought.steps.set(step, {
+                      if (!thoughtSteps.has(step)) {
+                        thoughtSteps.set(step, {
                           step_point: step,
                           step_name: step.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
                         step_category: 'inferred',
@@ -445,10 +446,11 @@ export default function RuntimeControlPage() {
                 // Check if there's a completed_steps array we should process
                 if (thought.completed_steps && Array.isArray(thought.completed_steps) && trackedThought) {
                   console.log('📋 Found completed_steps array:', thought.completed_steps);
+                  const thoughtSteps = trackedThought.steps;  // Capture the reference
                   thought.completed_steps.forEach((completedStep: any) => {
                     const stepEnum = completedStep.toUpperCase().replace(/ /g, '_') as H3EREStepPoint;
-                    if (!trackedThought.steps.has(stepEnum)) {
-                      trackedThought.steps.set(stepEnum, {
+                    if (!thoughtSteps.has(stepEnum)) {
+                      thoughtSteps.set(stepEnum, {
                         step_point: stepEnum,
                         step_name: completedStep.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
                         step_category: 'completed',
@@ -463,10 +465,11 @@ export default function RuntimeControlPage() {
                 // Also check for step_history or pipeline_steps
                 if (thought.step_history && Array.isArray(thought.step_history) && trackedThought) {
                   console.log('📜 Found step_history:', thought.step_history);
+                  const thoughtSteps = trackedThought.steps;  // Capture the reference
                   thought.step_history.forEach((stepInfo: any) => {
                     const stepEnum = (stepInfo.step_name || stepInfo.step || stepInfo).toUpperCase().replace(/ /g, '_') as H3EREStepPoint;
-                    if (!trackedThought.steps.has(stepEnum) && Object.values(H3EREStepPoint).includes(stepEnum)) {
-                      trackedThought.steps.set(stepEnum, {
+                    if (!thoughtSteps.has(stepEnum) && Object.values(H3EREStepPoint).includes(stepEnum)) {
+                      thoughtSteps.set(stepEnum, {
                         step_point: stepEnum,
                         step_name: (stepInfo.step_name || stepInfo.step || stepInfo).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
                         step_category: stepInfo.category || 'historical',
@@ -484,10 +487,11 @@ export default function RuntimeControlPage() {
                 // Check for pipeline_steps
                 if (thought.pipeline_steps && typeof thought.pipeline_steps === 'object' && trackedThought) {
                   console.log('🔧 Found pipeline_steps:', thought.pipeline_steps);
+                  const thoughtSteps = trackedThought.steps;  // Capture the reference
                   Object.entries(thought.pipeline_steps).forEach(([stepName, stepData]: [string, any]) => {
                     const stepEnum = stepName.toUpperCase().replace(/ /g, '_') as H3EREStepPoint;
-                    if (!trackedThought.steps.has(stepEnum) && Object.values(H3EREStepPoint).includes(stepEnum)) {
-                      trackedThought.steps.set(stepEnum, {
+                    if (!thoughtSteps.has(stepEnum) && Object.values(H3EREStepPoint).includes(stepEnum)) {
+                      thoughtSteps.set(stepEnum, {
                         step_point: stepEnum,
                         step_name: stepName.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()),
                         step_category: stepData.category || 'pipeline',
