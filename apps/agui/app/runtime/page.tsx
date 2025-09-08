@@ -701,26 +701,44 @@ export default function RuntimeControlPage() {
   const animateStep = useCallback((step: H3EREStepPoint) => {
     const svgId = stepToSvgId[step];
     if (svgId) {
-      // Delay ROUND_COMPLETE to ensure it animates after ACTION_COMPLETE
-      const delay = step === H3EREStepPoint.ROUND_COMPLETE ? 300 : 0;
+      // If we get ACTION_COMPLETE (step 7) or ROUND_COMPLETE (step 8), animate both
+      const stepsToAnimate = [step];
+      if (step === H3EREStepPoint.ACTION_COMPLETE || 
+          step === H3EREStepPoint.ROUND_COMPLETE) {
+        // Add both steps 7 and 8
+        if (!stepsToAnimate.includes(H3EREStepPoint.ACTION_COMPLETE)) {
+          stepsToAnimate.push(H3EREStepPoint.ACTION_COMPLETE);
+        }
+        if (!stepsToAnimate.includes(H3EREStepPoint.ROUND_COMPLETE)) {
+          stepsToAnimate.push(H3EREStepPoint.ROUND_COMPLETE);
+        }
+      }
       
-      setTimeout(() => {
-        // Use requestAnimationFrame to avoid blocking
-        requestAnimationFrame(() => {
-          setAnimatedSteps(prev => new Set([...prev, svgId]));
+      stepsToAnimate.forEach((stepToAnimate, index) => {
+        const targetSvgId = stepToSvgId[stepToAnimate];
+        if (targetSvgId) {
+          // Delay ROUND_COMPLETE slightly to create a sequence effect
+          const delay = stepToAnimate === H3EREStepPoint.ROUND_COMPLETE ? 300 : 0;
           
-          // Remove animation after 0.2 seconds
           setTimeout(() => {
-            setAnimatedSteps(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(svgId);
-              return newSet;
+            // Use requestAnimationFrame to avoid blocking
+            requestAnimationFrame(() => {
+              setAnimatedSteps(prev => new Set([...prev, targetSvgId]));
+              
+              // Remove animation after 3 seconds
+              setTimeout(() => {
+                setAnimatedSteps(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(targetSvgId);
+                  return newSet;
+                });
+              }, 3000);
             });
-          }, 200);
-        });
-      }, delay);
+          }, delay);
+        }
+      });
     }
-  }, []);
+  }, [stepToSvgId]);
   
   // Visual step indicators for SVG highlighting
   useEffect(() => {
@@ -887,20 +905,30 @@ export default function RuntimeControlPage() {
             <div className="min-w-[1200px] bg-gray-50 rounded-lg p-4">
               <style dangerouslySetInnerHTML={{ __html: `
                 ${Array.from(animatedSteps).map(id => `
+                  #${id} *,
                   #${id} path,
                   #${id} line,
                   #${id} circle,
                   #${id} rect,
                   #${id} ellipse,
                   #${id} polygon {
-                    stroke: #10b981 !important;
-                    fill: #10b981 !important;
+                    stroke: #ff0000 !important;
+                    fill: #ff0000 !important;
                     opacity: 1 !important;
-                    transition: stroke 0.3s ease, fill 0.3s ease, opacity 0.3s ease;
+                    transform: scale(1.1) !important;
+                    transform-origin: center !important;
+                    filter: drop-shadow(0 0 8px #ff0000) !important;
+                    transition: all 0.3s ease !important;
+                    animation: pulse 1s ease-in-out !important;
                   }
                   #${id} text {
-                    fill: #10b981 !important;
-                    transition: fill 0.3s ease;
+                    fill: #ff0000 !important;
+                    font-weight: bold !important;
+                    transition: all 0.3s ease !important;
+                  }
+                  @keyframes pulse {
+                    0%, 100% { transform: scale(1.1); }
+                    50% { transform: scale(1.2); }
                   }
                 `).join('')}
               ` }} />
