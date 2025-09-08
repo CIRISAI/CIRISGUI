@@ -31,7 +31,7 @@ interface AgentContextType {
 
 const AgentContext = createContext<AgentContextType | null>(null);
 
-// Detect deployment mode based on URL path
+// Detect deployment mode based on URL path and hostname
 function detectDeploymentMode(): { mode: 'standalone' | 'managed', agentId: string | null, apiBase: string } {
   if (typeof window === 'undefined') {
     // Server-side rendering, default to standalone
@@ -39,16 +39,26 @@ function detectDeploymentMode(): { mode: 'standalone' | 'managed', agentId: stri
   }
 
   const path = window.location.pathname;
-  const isManaged = path.startsWith('/agent/');
-
-  if (isManaged) {
-    // Managed mode: extract agent ID from /agent/{agent_id}
-    const pathParts = path.split('/');
-    const agentId = pathParts[2] || 'default';
+  const hostname = window.location.hostname;
+  
+  // Check if we're on the production domain (managed mode)
+  const isProduction = hostname === 'agents.ciris.ai';
+  const isAgentPath = path.startsWith('/agent/');
+  
+  if (isProduction || isAgentPath) {
+    // Managed mode: either production domain or explicit agent path
+    let agentId = 'datum'; // default agent for production
+    
+    if (isAgentPath) {
+      // Extract agent ID from /agent/{agent_id} path
+      const pathParts = path.split('/');
+      agentId = pathParts[2] || 'datum';
+    }
+    
     const apiBase = `/api/${agentId}/v1`;
     return { mode: 'managed', agentId, apiBase };
   } else {
-    // Standalone mode: direct API access
+    // Standalone mode: direct API access (localhost development)
     return { mode: 'standalone', agentId: 'default', apiBase: '/v1' };
   }
 }
