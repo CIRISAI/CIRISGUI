@@ -683,17 +683,17 @@ export default function RuntimeControlPage() {
   
   // Map H3ERE step points to new SVG element IDs
   const stepToSvgId: Record<H3EREStepPoint, string | null> = {
-    [H3EREStepPoint.START_ROUND]: null, // Not in new SVG
+    [H3EREStepPoint.START_ROUND]: '0-start',
     [H3EREStepPoint.GATHER_CONTEXT]: '1-context',
-    [H3EREStepPoint.PERFORM_DMAS]: null, // Not in new SVG
+    [H3EREStepPoint.PERFORM_DMAS]: '2-perform-dma',
     [H3EREStepPoint.PERFORM_ASPDMA]: '3-perform-aspdma',
     [H3EREStepPoint.CONSCIENCE_EXECUTION]: '4-conscience',
     [H3EREStepPoint.FINALIZE_ACTION]: '5-option-handler',
     [H3EREStepPoint.PERFORM_ACTION]: '6-handler',
     [H3EREStepPoint.ACTION_COMPLETE]: '6-handler-execution',
     [H3EREStepPoint.ROUND_COMPLETE]: '8-round-complete',
-    [H3EREStepPoint.RECURSIVE_ASPDMA]: null, // Not in new SVG
-    [H3EREStepPoint.RECURSIVE_CONSCIENCE]: null, // Not in new SVG
+    [H3EREStepPoint.RECURSIVE_ASPDMA]: '3-perform-aspdma', // Recursive - reuses step 3
+    [H3EREStepPoint.RECURSIVE_CONSCIENCE]: '4-conscience', // Recursive - reuses step 4
   };
   
   // Function to animate a step without blocking
