@@ -670,40 +670,49 @@ export default function RuntimeControlPage() {
   }, []);
 
   // Track animated steps
-  const [animatedSteps, setAnimatedSteps] = useState<Set<number>>(new Set());
+  const [animatedSteps, setAnimatedSteps] = useState<Set<string>>(new Set());
+  const [svgContent, setSvgContent] = useState<string>('');
   
-  // Map H3ERE step points to SVG number IDs (1-indexed)
-  const stepToNumber: Record<H3EREStepPoint, number> = {
-    [H3EREStepPoint.START_ROUND]: 1,
-    [H3EREStepPoint.GATHER_CONTEXT]: 2,
-    [H3EREStepPoint.PERFORM_DMAS]: 3,
-    [H3EREStepPoint.PERFORM_ASPDMA]: 4,
-    [H3EREStepPoint.CONSCIENCE_EXECUTION]: 5,
-    [H3EREStepPoint.FINALIZE_ACTION]: 6,
-    [H3EREStepPoint.PERFORM_ACTION]: 7,
-    [H3EREStepPoint.ACTION_COMPLETE]: 8,
-    [H3EREStepPoint.ROUND_COMPLETE]: 9,
-    [H3EREStepPoint.RECURSIVE_ASPDMA]: 10,
-    [H3EREStepPoint.RECURSIVE_CONSCIENCE]: 11,
+  // Load the SVG content
+  useEffect(() => {
+    fetch('/pipeline-visualization.svg')
+      .then(res => res.text())
+      .then(svg => setSvgContent(svg))
+      .catch(err => console.error('Failed to load SVG:', err));
+  }, []);
+  
+  // Map H3ERE step points to new SVG element IDs
+  const stepToSvgId: Record<H3EREStepPoint, string | null> = {
+    [H3EREStepPoint.START_ROUND]: null, // Not in new SVG
+    [H3EREStepPoint.GATHER_CONTEXT]: '1-context',
+    [H3EREStepPoint.PERFORM_DMAS]: null, // Not in new SVG
+    [H3EREStepPoint.PERFORM_ASPDMA]: '3-perform-aspdma',
+    [H3EREStepPoint.CONSCIENCE_EXECUTION]: '4-conscience',
+    [H3EREStepPoint.FINALIZE_ACTION]: '5-option-handler',
+    [H3EREStepPoint.PERFORM_ACTION]: '6-handler',
+    [H3EREStepPoint.ACTION_COMPLETE]: '6-handler-execution',
+    [H3EREStepPoint.ROUND_COMPLETE]: '8-round-complete',
+    [H3EREStepPoint.RECURSIVE_ASPDMA]: null, // Not in new SVG
+    [H3EREStepPoint.RECURSIVE_CONSCIENCE]: null, // Not in new SVG
   };
   
   // Function to animate a step without blocking
   const animateStep = useCallback((step: H3EREStepPoint) => {
-    const stepNumber = stepToNumber[step];
-    if (stepNumber) {
+    const svgId = stepToSvgId[step];
+    if (svgId) {
       // Delay ROUND_COMPLETE to ensure it animates after ACTION_COMPLETE
       const delay = step === H3EREStepPoint.ROUND_COMPLETE ? 300 : 0;
       
       setTimeout(() => {
         // Use requestAnimationFrame to avoid blocking
         requestAnimationFrame(() => {
-          setAnimatedSteps(prev => new Set([...prev, stepNumber]));
+          setAnimatedSteps(prev => new Set([...prev, svgId]));
           
           // Remove animation after 0.2 seconds
           setTimeout(() => {
             setAnimatedSteps(prev => {
               const newSet = new Set(prev);
-              newSet.delete(stepNumber);
+              newSet.delete(svgId);
               return newSet;
             });
           }, 200);
@@ -875,91 +884,32 @@ export default function RuntimeControlPage() {
           {/* SVG Container with responsive sizing */}
           <div className="w-full overflow-x-auto">
             <div className="min-w-[1200px] bg-gray-50 rounded-lg p-4">
-              <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="150" viewBox="0 0 1200 150">
-                <title>H3ERE Pipeline Steps 1-11</title>
-                
-                {/* Render each number with appropriate color */}
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(num => {
-                  const isAnimated = animatedSteps.has(num);
-                  const strokeColor = isAnimated ? '#10b981' : '#000';
-                  const segStyle = { 
-                    stroke: strokeColor, 
-                    strokeWidth: 8, 
-                    strokeLinecap: 'round' as const, 
-                    fill: 'none',
-                    transition: 'stroke 0.3s ease'
-                  };
-                  
-                  // Define which segments are active for each number
-                  const segments: Record<number, string[]> = {
-                    1: ['b', 'c'],
-                    2: ['a', 'b', 'd', 'e', 'g'],
-                    3: ['a', 'b', 'c', 'd', 'g'],
-                    4: ['b', 'c', 'f', 'g'],
-                    5: ['a', 'c', 'd', 'f', 'g'],
-                    6: ['a', 'c', 'd', 'e', 'f', 'g'],
-                    7: ['a', 'b', 'c'],
-                    8: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
-                    9: ['a', 'b', 'c', 'd', 'f', 'g'],
-                  };
-                  
-                  // Helper to draw a segment
-                  const drawSegment = (seg: string, offsetX: number = 0) => {
-                    const segCoords: Record<string, [number, number, number, number]> = {
-                      a: [10, 10, 40, 10],
-                      b: [40, 10, 40, 40],
-                      c: [40, 40, 40, 70],
-                      d: [10, 70, 40, 70],
-                      e: [10, 40, 10, 70],
-                      f: [10, 10, 10, 40],
-                      g: [10, 40, 40, 40],
-                    };
-                    const [x1, y1, x2, y2] = segCoords[seg];
-                    return (
-                      <line 
-                        key={`${num}-${seg}-${offsetX}`}
-                        x1={x1 + offsetX} 
-                        y1={y1} 
-                        x2={x2 + offsetX} 
-                        y2={y2} 
-                        style={segStyle}
-                      />
-                    );
-                  };
-                  
-                  // Handle single digit numbers (1-9)
-                  if (num < 10) {
-                    return (
-                      <g key={num} transform={`translate(${(num - 1) * 100},35)`}>
-                        {segments[num].map(seg => drawSegment(seg))}
-                      </g>
-                    );
+              <style dangerouslySetInnerHTML={{ __html: `
+                ${Array.from(animatedSteps).map(id => `
+                  #${id} path,
+                  #${id} line,
+                  #${id} circle,
+                  #${id} rect,
+                  #${id} ellipse,
+                  #${id} polygon {
+                    stroke: #10b981 !important;
+                    fill: #10b981 !important;
+                    opacity: 1 !important;
+                    transition: stroke 0.3s ease, fill 0.3s ease, opacity 0.3s ease;
                   }
-                  
-                  // Handle double digit numbers (10, 11)
-                  if (num === 10) {
-                    return (
-                      <g key={num} transform="translate(900,35)">
-                        {/* "1" */}
-                        {segments[1].map(seg => drawSegment(seg, 0))}
-                        {/* "0" - all segments except g */}
-                        {['a', 'b', 'c', 'd', 'e', 'f'].map(seg => drawSegment(seg, 60))}
-                      </g>
-                    );
+                  #${id} text {
+                    fill: #10b981 !important;
+                    transition: fill 0.3s ease;
                   }
-                  
-                  if (num === 11) {
-                    return (
-                      <g key={num} transform="translate(1050,35)">
-                        {/* First "1" */}
-                        {segments[1].map(seg => drawSegment(seg, 0))}
-                        {/* Second "1" */}
-                        {segments[1].map(seg => drawSegment(seg, 60))}
-                      </g>
-                    );
-                  }
-                })}
-              </svg>
+                `).join('')}
+              ` }} />
+              {svgContent ? (
+                <div dangerouslySetInnerHTML={{ __html: svgContent }} />
+              ) : (
+                <div className="flex items-center justify-center h-[150px] text-gray-500">
+                  Loading pipeline visualization...
+                </div>
+              )}
             </div>
           </div>
 
