@@ -46,9 +46,14 @@ export class CIRISClient {
     let defaultBaseURL: string;
     
     if (typeof window !== 'undefined') {
-      // In browser: check for environment variable first, then use relative path for API proxy
-      // The Next.js app proxies /api/* to the backend API
-      defaultBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
+      // Client-side
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        // Development: use environment variable or default
+        defaultBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+      } else {
+        // Production: use relative path (same origin) to avoid CORS
+        defaultBaseURL = '';
+      }
     } else {
       // Server-side: use environment variable or localhost
       defaultBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
@@ -197,10 +202,21 @@ export class CIRISClient {
 // Create a singleton instance with proper defaults
 // This will be reconfigured by SDKConfigManager when agent is selected
 const createDefaultClient = () => {
-  // For browser environments, we need to ensure we're not hitting the Next.js server
-  const baseURL = typeof window !== 'undefined' 
-    ? (process.env.NEXT_PUBLIC_API_BASE_URL || '/api/default')
-    : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080');
+  // For browser environments, use relative path in production to avoid CORS
+  let baseURL: string;
+  if (typeof window !== 'undefined') {
+    // Client-side
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Development: use environment variable or default
+      baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+    } else {
+      // Production: use relative path (same origin)
+      baseURL = '';
+    }
+  } else {
+    // Server-side
+    baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+  }
   
   console.log('[CIRIS SDK] Creating default client with baseURL:', baseURL);
   

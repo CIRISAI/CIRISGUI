@@ -211,7 +211,11 @@ export default function RuntimeControlPage() {
       return;
     }
 
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+    // In production, use relative URL to avoid CORS issues
+    // In development, use the environment variable
+    const apiBaseUrl = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      ? '' // Use relative path in production (same origin)
+      : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080');
     const streamUrl = `${apiBaseUrl}/v1/system/runtime/reasoning-stream`;
     
     console.log('🔌 Connecting to reasoning stream:', streamUrl);
