@@ -53,6 +53,7 @@ interface ThoughtStep {
   progress_percentage?: number;
   round_number?: number;
   stream_sequence?: number;  // Track which update this came from
+  raw_server_data?: any;  // Store the complete raw data from server
 }
 
 interface TrackedThought {
@@ -542,7 +543,8 @@ export default function RuntimeControlPage() {
                     transparency_data: thought.transparency_data,
                     progress_percentage: thought.progress_percentage,
                     round_number: thought.round_number,
-                    stream_sequence: update.stream_sequence
+                    stream_sequence: update.stream_sequence,
+                    raw_server_data: thought  // Store the complete thought data from server
                   };
                   
                   // Store this step data
@@ -673,6 +675,8 @@ export default function RuntimeControlPage() {
   // Track animated steps
   const [animatedSteps, setAnimatedSteps] = useState<Set<string>>(new Set());
   const [svgContent, setSvgContent] = useState<string>('');
+  const [lastAnimatedStep, setLastAnimatedStep] = useState<H3EREStepPoint | null>(null);
+  const [lastAnimationTime, setLastAnimationTime] = useState<number>(0);
   
   // Load the SVG content
   useEffect(() => {
@@ -697,12 +701,22 @@ export default function RuntimeControlPage() {
     [H3EREStepPoint.RECURSIVE_CONSCIENCE]: '4-conscience', // Recursive - reuses step 4
   };
   
-  // Function to animate a step - simple and direct
+  // Function to animate a step - simple and direct with spam prevention
   const animateStep = useCallback((step: H3EREStepPoint) => {
+    const now = Date.now();
+    
+    // Prevent spam: skip if same step within 1 second
+    if (step === lastAnimatedStep && now - lastAnimationTime < 1000) {
+      console.log(`🚫 Skipping duplicate step: ${step} (too recent)`);
+      return;
+    }
+    
     const svgId = stepToSvgId[step];
     if (!svgId) return;
     
     console.log(`🎨 Animating step: ${step} -> SVG ID: ${svgId}`);
+    setLastAnimatedStep(step);
+    setLastAnimationTime(now);
     
     // Check if the element actually exists in the DOM
     setTimeout(() => {
@@ -736,7 +750,7 @@ export default function RuntimeControlPage() {
         }
       });
     }, 100);
-  }, [stepToSvgId]);
+  }, [stepToSvgId, lastAnimatedStep, lastAnimationTime]);
   
   // Visual step indicators for SVG highlighting
   useEffect(() => {
@@ -1177,6 +1191,16 @@ export default function RuntimeControlPage() {
                                           </summary>
                                           <pre className="mt-1 p-2 bg-purple-50 rounded overflow-x-auto">
                                             {JSON.stringify(step.transparency_data, null, 2)}
+                                          </pre>
+                                        </details>
+                                      )}
+                                      {step.raw_server_data && (
+                                        <details className="text-xs">
+                                          <summary className="cursor-pointer text-orange-600 hover:text-orange-800">
+                                            Raw Server Data
+                                          </summary>
+                                          <pre className="mt-1 p-2 bg-orange-50 rounded overflow-x-auto text-xs">
+                                            {JSON.stringify(step.raw_server_data, null, 2)}
                                           </pre>
                                         </details>
                                       )}
