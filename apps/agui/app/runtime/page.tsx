@@ -697,47 +697,45 @@ export default function RuntimeControlPage() {
     [H3EREStepPoint.RECURSIVE_CONSCIENCE]: '4-conscience', // Recursive - reuses step 4
   };
   
-  // Function to animate a step without blocking
+  // Function to animate a step - simple and direct
   const animateStep = useCallback((step: H3EREStepPoint) => {
     const svgId = stepToSvgId[step];
-    if (svgId) {
-      // If we get ACTION_COMPLETE (step 7) or ROUND_COMPLETE (step 8), animate both
-      const stepsToAnimate = [step];
-      if (step === H3EREStepPoint.ACTION_COMPLETE || 
-          step === H3EREStepPoint.ROUND_COMPLETE) {
-        // Add both steps 7 and 8
-        if (!stepsToAnimate.includes(H3EREStepPoint.ACTION_COMPLETE)) {
-          stepsToAnimate.push(H3EREStepPoint.ACTION_COMPLETE);
-        }
-        if (!stepsToAnimate.includes(H3EREStepPoint.ROUND_COMPLETE)) {
-          stepsToAnimate.push(H3EREStepPoint.ROUND_COMPLETE);
-        }
+    if (!svgId) return;
+    
+    console.log(`🎨 Animating step: ${step} -> SVG ID: ${svgId}`);
+    
+    // Check if the element actually exists in the DOM
+    setTimeout(() => {
+      const element = document.getElementById(svgId);
+      console.log(`🔍 Element ${svgId} found:`, !!element);
+      if (element) {
+        console.log(`📍 Element type: ${element.tagName}, classes: ${element.className}`);
       }
       
-      stepsToAnimate.forEach((stepToAnimate, index) => {
+      // For ACTION_COMPLETE or ROUND_COMPLETE, animate both steps 7 and 8
+      const stepsToAnimate = [step];
+      if (step === H3EREStepPoint.ACTION_COMPLETE || step === H3EREStepPoint.ROUND_COMPLETE) {
+        stepsToAnimate.push(
+          step === H3EREStepPoint.ACTION_COMPLETE ? H3EREStepPoint.ROUND_COMPLETE : H3EREStepPoint.ACTION_COMPLETE
+        );
+      }
+      
+      stepsToAnimate.forEach(stepToAnimate => {
         const targetSvgId = stepToSvgId[stepToAnimate];
         if (targetSvgId) {
-          // Delay ROUND_COMPLETE slightly to create a sequence effect
-          const delay = stepToAnimate === H3EREStepPoint.ROUND_COMPLETE ? 300 : 0;
+          setAnimatedSteps(prev => new Set([...prev, targetSvgId]));
           
+          // Remove animation after 2 seconds
           setTimeout(() => {
-            // Use requestAnimationFrame to avoid blocking
-            requestAnimationFrame(() => {
-              setAnimatedSteps(prev => new Set([...prev, targetSvgId]));
-              
-              // Remove animation after 3 seconds
-              setTimeout(() => {
-                setAnimatedSteps(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(targetSvgId);
-                  return newSet;
-                });
-              }, 3000);
+            setAnimatedSteps(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(targetSvgId);
+              return newSet;
             });
-          }, delay);
+          }, 2000);
         }
       });
-    }
+    }, 100);
   }, [stepToSvgId]);
   
   // Visual step indicators for SVG highlighting
@@ -843,7 +841,7 @@ export default function RuntimeControlPage() {
             </div>
 
             <div className="bg-gray-50 px-4 py-5 sm:p-6 rounded-lg">
-              <dt className="text-sm font-medium text-gray-500">Current Step</dt>
+              <dt className="text-sm font-medium text-gray-500">Most Recent Event</dt>
               <dd className="mt-1 text-lg font-semibold text-blue-600">
                 {currentStepPoint ? getH3EREStepDisplayName(currentStepPoint) : 'None'}
               </dd>
@@ -905,32 +903,25 @@ export default function RuntimeControlPage() {
             <div className="min-w-[1200px] bg-gray-50 rounded-lg p-4">
               <style dangerouslySetInnerHTML={{ __html: `
                 ${Array.from(animatedSteps).map(id => `
-                  #${id} *,
-                  #${id} path,
-                  #${id} line,
-                  #${id} circle,
-                  #${id} rect,
-                  #${id} ellipse,
-                  #${id} polygon {
+                  #${id}, g#${id} {
                     stroke: #ff0000 !important;
                     fill: #ff0000 !important;
+                    stroke-width: 5 !important;
                     opacity: 1 !important;
-                    transform: scale(1.1) !important;
-                    transform-origin: center !important;
-                    filter: drop-shadow(0 0 8px #ff0000) !important;
-                    transition: all 0.3s ease !important;
-                    animation: pulse 1s ease-in-out !important;
+                    animation: simplePulse 1s ease-in-out infinite !important;
                   }
-                  #${id} text {
+                  #${id} *, g#${id} * {
+                    stroke: #ff0000 !important;
                     fill: #ff0000 !important;
-                    font-weight: bold !important;
-                    transition: all 0.3s ease !important;
-                  }
-                  @keyframes pulse {
-                    0%, 100% { transform: scale(1.1); }
-                    50% { transform: scale(1.2); }
+                    stroke-width: 3 !important;
+                    opacity: 1 !important;
                   }
                 `).join('')}
+                
+                @keyframes simplePulse {
+                  0%, 100% { opacity: 1; }
+                  50% { opacity: 0.3; }
+                }
               ` }} />
               {svgContent ? (
                 <div dangerouslySetInnerHTML={{ __html: svgContent }} />
