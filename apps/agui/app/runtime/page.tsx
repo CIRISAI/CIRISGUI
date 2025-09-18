@@ -1179,7 +1179,7 @@ export default function RuntimeControlPage() {
                                           <summary className="cursor-pointer text-blue-600 hover:text-blue-800">
                                             Step Result Data
                                           </summary>
-                                          <pre className="mt-1 p-2 bg-gray-100 rounded overflow-x-auto">
+                                          <pre className="mt-1 p-2 bg-gray-100 rounded text-xs whitespace-pre-wrap break-words max-w-full overflow-hidden">
                                             {JSON.stringify(step.step_result, null, 2)}
                                           </pre>
                                         </details>
@@ -1189,7 +1189,7 @@ export default function RuntimeControlPage() {
                                           <summary className="cursor-pointer text-purple-600 hover:text-purple-800">
                                             Transparency Data
                                           </summary>
-                                          <pre className="mt-1 p-2 bg-purple-50 rounded overflow-x-auto">
+                                          <pre className="mt-1 p-2 bg-purple-50 rounded text-xs whitespace-pre-wrap break-words max-w-full overflow-hidden">
                                             {JSON.stringify(step.transparency_data, null, 2)}
                                           </pre>
                                         </details>
@@ -1199,7 +1199,7 @@ export default function RuntimeControlPage() {
                                           <summary className="cursor-pointer text-orange-600 hover:text-orange-800">
                                             Raw Server Data
                                           </summary>
-                                          <pre className="mt-1 p-2 bg-orange-50 rounded overflow-x-auto text-xs">
+                                          <pre className="mt-1 p-2 bg-orange-50 rounded text-xs whitespace-pre-wrap break-words max-w-full overflow-hidden">
                                             {JSON.stringify(step.raw_server_data, null, 2)}
                                           </pre>
                                         </details>
