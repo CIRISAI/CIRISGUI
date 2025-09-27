@@ -97,44 +97,6 @@ export function useAgentDiscovery(options: UseAgentDiscoveryOptions = {}) {
     }
   }, [sdk, selectedAgent, onError]);
 
-  const getDeploymentStatus = useCallback(async (agentId: string) => {
-    if (!sdk) return null;
-
-    try {
-      return await sdk.manager.getDeploymentStatus(agentId);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to get deployment status');
-      onError?.(error);
-      return null;
-    }
-  }, [sdk, onError]);
-
-  const notifyUpdate = useCallback(async (
-    agentId: string,
-    version: string,
-    changelog?: string,
-    urgency?: 'low' | 'normal' | 'high' | 'critical'
-  ) => {
-    if (!sdk) return;
-
-    try {
-      const result = await sdk.manager.notifyUpdate(agentId, {
-        agent_id: agentId,
-        new_version: version,
-        changelog,
-        urgency
-      });
-
-      // Refresh the agent to get updated status
-      await refreshAgent(agentId);
-
-      return result;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to notify update');
-      onError?.(error);
-      throw error;
-    }
-  }, [sdk, refreshAgent, onError]);
 
   // Initial fetch
   useEffect(() => {
@@ -160,8 +122,6 @@ export function useAgentDiscovery(options: UseAgentDiscoveryOptions = {}) {
     fetchAgents,
     selectAgent,
     refreshAgent,
-    getDeploymentStatus,
-    notifyUpdate,
 
     // Computed
     runningAgents: agents.filter(a => a.status === 'running'),

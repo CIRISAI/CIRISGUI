@@ -390,6 +390,14 @@ export class Transport {
     // Add auth header if available
     if (!skipAuth) {
       const token = AuthStore.getAccessToken();
+      // Ensure we never accidentally use the manager token
+      if (token && typeof window !== 'undefined') {
+        const managerToken = localStorage.getItem('manager_token');
+        if (token === managerToken) {
+          console.warn('[CIRIS SDK] Detected manager token, skipping auth for CIRIS SDK request');
+          return headers; // Don't add auth header
+        }
+      }
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }

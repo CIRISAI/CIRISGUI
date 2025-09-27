@@ -16,28 +16,6 @@ export interface AgentInfo {
   update_available: boolean;
 }
 
-export interface AgentCreationRequest {
-  agent_name: string;
-  agent_type?: string;
-  adapters?: string[];
-  environment?: Record<string, string>;
-  wa_signature?: string;
-}
-
-export interface UpdateNotification {
-  agent_id: string;
-  new_version: string;
-  changelog?: string;
-  urgency?: 'low' | 'normal' | 'high' | 'critical';
-}
-
-export interface DeploymentStatus {
-  agent_id: string;
-  status: string;
-  message: string;
-  staged_container?: string;
-  consent_status?: string;
-}
 
 export interface ManagerHealth {
   status: 'healthy' | 'unhealthy';
@@ -77,37 +55,6 @@ export class ManagerResource extends BaseResource {
     return this.transport.request<AgentInfo>('GET', managerUrl, { skipAuth: true });
   }
 
-  /**
-   * Create a new CIRIS agent with WA authorization
-   * Requires: Local authentication and valid WA signature
-   */
-  async createAgent(data: AgentCreationRequest): Promise<AgentInfo> {
-    const managerUrl = typeof window !== 'undefined'
-      ? `${window.location.origin}/manager/v1/agents`
-      : '/manager/v1/agents';
-    return this.transport.request<AgentInfo>('POST', managerUrl, { body: data });
-  }
-
-  /**
-   * Notify an agent that an update is available
-   * Requires: Local authentication
-   */
-  async notifyUpdate(agentId: string, notification: UpdateNotification): Promise<{ status: string; message: string }> {
-    const managerUrl = typeof window !== 'undefined'
-      ? `${window.location.origin}/manager/v1/agents/${agentId}/notify-update`
-      : `/manager/v1/agents/${agentId}/notify-update`;
-    return this.transport.request<{ status: string; message: string }>('POST', managerUrl, { body: notification });
-  }
-
-  /**
-   * Get the deployment status for an agent
-   */
-  async getDeploymentStatus(agentId: string): Promise<DeploymentStatus> {
-    const managerUrl = typeof window !== 'undefined'
-      ? `${window.location.origin}/manager/v1/deployments/${agentId}/status`
-      : `/manager/v1/deployments/${agentId}/status`;
-    return this.transport.request<DeploymentStatus>('GET', managerUrl);
-  }
 
   /**
    * Health check endpoint for CIRISManager
