@@ -62,7 +62,7 @@ export class ManagerResource extends BaseResource {
       ? `${window.location.origin}/manager/v1/agents`
       : '/manager/v1/agents';
 
-    const response = await this.transport.request<{ agents: AgentInfo[] }>('GET', managerUrl);
+    const response = await this.transport.request<{ agents: AgentInfo[] }>('GET', managerUrl, { skipAuth: true });
     // Extract agents array from response
     return response.agents || [];
   }
@@ -74,7 +74,7 @@ export class ManagerResource extends BaseResource {
     const managerUrl = typeof window !== 'undefined'
       ? `${window.location.origin}/manager/v1/agents/${agentId}`
       : `/manager/v1/agents/${agentId}`;
-    return this.transport.request<AgentInfo>('GET', managerUrl);
+    return this.transport.request<AgentInfo>('GET', managerUrl, { skipAuth: true });
   }
 
   /**
@@ -116,6 +116,6 @@ export class ManagerResource extends BaseResource {
     const managerUrl = typeof window !== 'undefined'
       ? `${window.location.origin}/manager/v1/health`
       : '/manager/v1/health';
-    return this.transport.request<ManagerHealth>('GET', managerUrl);
+    return this.transport.request<ManagerHealth>('GET', managerUrl, { skipAuth: true });
   }
 }
