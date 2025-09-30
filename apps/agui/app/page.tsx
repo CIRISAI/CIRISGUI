@@ -37,12 +37,12 @@ export default function InteractPage() {
   const [streamError, setStreamError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Simple step mapping for 4-step visualization
+  // Simple step mapping for 4-step visualization (using lowercase to match API)
   const simpleSteps = {
-    'DMAS': ['GATHER_CONTEXT', 'PERFORM_DMAS', 'PERFORM_ASPDMA'],
-    'ACTION_SELECTION': ['FINALIZE_ACTION'],
-    'CONSCIENCE': ['CONSCIENCE_EXECUTION', 'RECURSIVE_CONSCIENCE'],
-    'ACTION_COMPLETE': ['PERFORM_ACTION', 'ACTION_COMPLETE', 'ROUND_COMPLETE']
+    'DMAS': ['gather_context', 'perform_dmas', 'perform_aspdma'],
+    'ACTION_SELECTION': ['finalize_action'],
+    'CONSCIENCE': ['conscience_execution', 'recursive_conscience', 'recursive_aspdma'],
+    'ACTION_COMPLETE': ['perform_action', 'action_complete', 'round_complete']
   };
 
   // Ensure SDK is configured for the current agent
@@ -220,13 +220,14 @@ export default function InteractPage() {
             console.log('❌ No step found in update or thoughts');
           }
 
-          // Group data by rounds
-          if (update.round_number !== undefined) {
+          // Group data by rounds (use current_round from API)
+          const roundNumber = update.current_round || update.round_number;
+          if (roundNumber !== undefined) {
             setReasoningRounds(prev => {
               const newMap = new Map(prev);
-              const roundData = newMap.get(update.round_number) || [];
+              const roundData = newMap.get(roundNumber) || [];
               roundData.push(update);
-              newMap.set(update.round_number, roundData);
+              newMap.set(roundNumber, roundData);
               return newMap;
             });
           } else {
