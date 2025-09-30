@@ -32,7 +32,7 @@ export default function InteractPage() {
   // Simple reasoning visualization state
   const [reasoningData, setReasoningData] = useState<any[]>([]);
   const [activeStep, setActiveStep] = useState<string | null>(null);
-  const [reasoningRounds, setReasoningRounds] = useState<Map<number, any[]>>(new Map());
+  const [taskData, setTaskData] = useState<Map<string, Map<string, any[]>>>(new Map()); // taskId -> thoughtId -> steps
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -220,22 +220,45 @@ export default function InteractPage() {
             console.log('❌ No step found in update or thoughts');
           }
 
-          // Group data by rounds (use current_round from API)
-          const roundNumber = update.current_round || update.round_number;
-          if (roundNumber !== undefined) {
-            console.log(`📊 Adding to round ${roundNumber}:`, stepToProcess);
-            setReasoningRounds(prev => {
+          // Group data by taskId -> thoughtId -> steps
+          if (update.updated_thoughts && update.updated_thoughts.length > 0) {
+            const thought = update.updated_thoughts[0];
+            const taskId = thought.task_id;
+            const thoughtId = thought.thought_id;
+            const currentStep = thought.current_step;
+            const processingTime = thought.step_result?.processing_time_ms || thought.processing_time_ms || 0;
+
+            console.log(`📊 Adding step to task ${taskId}, thought ${thoughtId}: ${currentStep} (${processingTime}ms)`);
+
+            setTaskData(prev => {
               const newMap = new Map(prev);
-              const roundData = newMap.get(roundNumber) || [];
-              roundData.push(update);
-              newMap.set(roundNumber, roundData);
-              console.log(`📊 Round ${roundNumber} now has ${roundData.length} updates`);
+
+              // Get or create task entry
+              let taskMap = newMap.get(taskId);
+              if (!taskMap) {
+                taskMap = new Map();
+                newMap.set(taskId, taskMap);
+              }
+
+              // Get or create thought entry
+              let thoughtSteps = taskMap.get(thoughtId);
+              if (!thoughtSteps) {
+                thoughtSteps = [];
+                taskMap.set(thoughtId, thoughtSteps);
+              }
+
+              // Add step data
+              thoughtSteps.push({
+                step: currentStep,
+                processingTime: processingTime,
+                timestamp: thought.current_step_started_at || update.timestamp,
+                stepResult: thought.step_result,
+                status: thought.status
+              });
+
+              console.log(`📊 Task ${taskId} now has ${taskMap.size} thoughts, thought ${thoughtId} has ${thoughtSteps.length} steps`);
               return newMap;
             });
-          } else {
-            // Add to general reasoning data if no round number
-            console.log('📊 Adding to general reasoning data:', stepToProcess);
-            setReasoningData(prev => [...prev.slice(-20), update]); // Keep last 20
           }
 
         } else if (eventType === 'keepalive') {
@@ -643,7 +666,7 @@ export default function InteractPage() {
                 {/* Debug info */}
                 <div className="text-xs text-gray-500 mt-2">
                   Stream: {streamConnected ? 'Connected' : 'Disconnected'} |
-                  Rounds: {reasoningRounds.size} |
+                  Tasks: {taskData.size} |
                   Data: {reasoningData.length} |
                   Active: {activeStep || 'none'}
                 </div>
@@ -652,58 +675,75 @@ export default function InteractPage() {
           </div>
         )}
 
-        {/* Reasoning Data by Round */}
-        {currentAgent && reasoningRounds.size > 0 && (
+        {/* Reasoning Data by Task/Thought Hierarchy */}
+        {currentAgent && taskData.size > 0 && (
           <div className="mt-6 bg-white shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Reasoning Details by Round ({reasoningRounds.size} rounds)
+                Reasoning Details by Task ({taskData.size} tasks)
               </h3>
 
               <div className="space-y-4 max-h-96 overflow-y-auto">
-                {Array.from(reasoningRounds.entries())
-                  .sort(([a], [b]) => b - a) // Most recent rounds first
-                  .slice(0, 5) // Show last 5 rounds
-                  .map(([roundNumber, roundData]) => (
-                    <details key={roundNumber} className="border border-gray-200 rounded-lg">
-                      <summary className="cursor-pointer p-3 bg-gray-50 hover:bg-gray-100 rounded-t-lg">
-                        <span className="font-medium">Round {roundNumber}</span>
-                        <span className="ml-2 text-sm text-gray-500">
-                          ({roundData.length} steps)
+                {Array.from(taskData.entries())
+                  .slice(-5) // Show last 5 tasks
+                  .map(([taskId, thoughts]) => (
+                    <details key={taskId} className="border border-gray-200 rounded-lg">
+                      <summary className="cursor-pointer p-3 bg-blue-50 hover:bg-blue-100 rounded-t-lg">
+                        <span className="font-medium text-blue-900">Task: {taskId}</span>
+                        <span className="ml-2 text-sm text-blue-600">
+                          ({thoughts.size} thoughts)
                         </span>
                       </summary>
-                      <div className="p-3 space-y-2">
-                        {roundData.map((step, index) => (
-                          <div key={index} className="bg-gray-50 rounded p-2">
-                            <div className="flex justify-between items-start mb-1">
-                              <span className="text-sm font-medium text-gray-900">
-                                {step.step_point}
+                      <div className="p-3 space-y-3">
+                        {Array.from(thoughts.entries()).map(([thoughtId, steps]) => (
+                          <details key={thoughtId} className="border border-gray-100 rounded-md">
+                            <summary className="cursor-pointer p-2 bg-gray-50 hover:bg-gray-100 rounded-t-md">
+                              <span className="font-medium text-gray-700">Thought: {thoughtId}</span>
+                              <span className="ml-2 text-sm text-gray-500">
+                                ({steps.length} steps)
                               </span>
-                              <span className="text-xs text-gray-500">
-                                {step.processing_time_ms}ms
-                              </span>
+                            </summary>
+                            <div className="p-2 space-y-2">
+                              {steps.map((step, index) => (
+                                <div key={index} className="bg-white border rounded p-2">
+                                  <div className="flex justify-between items-start mb-1">
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {step.stepName}
+                                    </span>
+                                    <div className="text-xs text-gray-500">
+                                      <span className="font-medium">{step.processingTime}ms</span>
+                                      <span className="ml-2 text-gray-400">
+                                        {new Date(step.timestamp).toLocaleTimeString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="text-xs text-gray-600 mb-1">
+                                    Status: <span className="font-medium">{step.status}</span>
+                                  </div>
+                                  {step.stepResult && (
+                                    <details className="text-xs">
+                                      <summary className="cursor-pointer text-blue-600 hover:text-blue-800">
+                                        Step Data
+                                      </summary>
+                                      <pre className="mt-1 p-2 bg-gray-50 rounded overflow-x-auto text-xs whitespace-pre-wrap break-words">
+                                        {JSON.stringify(step.stepResult, null, 2)}
+                                      </pre>
+                                    </details>
+                                  )}
+                                  {step.transparencyData && (
+                                    <details className="text-xs mt-1">
+                                      <summary className="cursor-pointer text-purple-600 hover:text-purple-800">
+                                        Transparency Data
+                                      </summary>
+                                      <pre className="mt-1 p-2 bg-purple-50 rounded overflow-x-auto text-xs whitespace-pre-wrap break-words">
+                                        {JSON.stringify(step.transparencyData, null, 2)}
+                                      </pre>
+                                    </details>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                            {step.step_result && (
-                              <details className="text-xs">
-                                <summary className="cursor-pointer text-blue-600 hover:text-blue-800">
-                                  Step Data
-                                </summary>
-                                <pre className="mt-1 p-2 bg-white rounded overflow-x-auto text-xs whitespace-pre-wrap break-words">
-                                  {JSON.stringify(step.step_result, null, 2)}
-                                </pre>
-                              </details>
-                            )}
-                            {step.transparency_data && (
-                              <details className="text-xs mt-1">
-                                <summary className="cursor-pointer text-purple-600 hover:text-purple-800">
-                                  Transparency Data
-                                </summary>
-                                <pre className="mt-1 p-2 bg-purple-50 rounded overflow-x-auto text-xs whitespace-pre-wrap break-words">
-                                  {JSON.stringify(step.transparency_data, null, 2)}
-                                </pre>
-                              </details>
-                            )}
-                          </div>
+                          </details>
                         ))}
                       </div>
                     </details>
