@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cirisClient } from '../lib/ciris-sdk';
 import { sdkConfigManager } from '../lib/sdk-config-manager';
@@ -33,7 +33,6 @@ export default function InteractPage() {
   const [reasoningData, setReasoningData] = useState<any[]>([]);
   const [activeStep, setActiveStep] = useState<string | null>(null);
   const [conscienceResult, setConscienceResult] = useState<{passed: boolean, reasoning?: string} | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [taskData, setTaskData] = useState<Map<string, Map<string, any[]>>>(new Map()); // taskId -> thoughtId -> steps
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -46,6 +45,70 @@ export default function InteractPage() {
     ACTION_COMPLETE?: string;
   }>({});
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Animation queue system to prevent React batching issues
+  const animationQueue = useRef<string[]>([]);
+  const currentlyAnimating = useRef(false);
+  const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Process animation queue with delays to ensure each phase is visible
+  const processAnimationQueue = useCallback(async () => {
+    if (currentlyAnimating.current || animationQueue.current.length === 0) return;
+
+    console.log(`🎬 QUEUE: Starting animation queue processing with ${animationQueue.current.length} items`);
+    currentlyAnimating.current = true;
+
+    while (animationQueue.current.length > 0) {
+      const nextStep = animationQueue.current.shift();
+      if (nextStep) {
+        const queueTime = new Date().toLocaleTimeString();
+        console.log(`🎬 QUEUE: Setting activeStep to '${nextStep}' at ${queueTime}`);
+        setActiveStep(nextStep);
+
+        // Record the queued animation trigger time
+        setAnimationTriggers(prev => ({
+          ...prev,
+          [nextStep]: queueTime
+        }));
+
+        // Wait 800ms before next animation (ensures visibility)
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+    }
+
+    console.log(`🎬 QUEUE: Animation queue processing complete`);
+    currentlyAnimating.current = false;
+
+    // Clear after final step (with delay)
+    animationTimeoutRef.current = setTimeout(() => {
+      console.log(`🎬 QUEUE: Clearing activeStep after sequence complete`);
+      setActiveStep(null);
+    }, 2000);
+  }, []);
+
+  // Add animation step to queue and start processing
+  const queueAnimationStep = useCallback((step: string) => {
+    const queueTime = new Date().toLocaleTimeString();
+    console.log(`🎬 QUEUE: Adding '${step}' to animation queue at ${queueTime}`);
+
+    // Clear any existing timeout from previous sequences
+    if (animationTimeoutRef.current) {
+      clearTimeout(animationTimeoutRef.current);
+      animationTimeoutRef.current = null;
+    }
+
+    // Only add if it's different from the last item in queue (prevent duplicates)
+    const lastQueued = animationQueue.current[animationQueue.current.length - 1];
+    if (lastQueued !== step) {
+      animationQueue.current.push(step);
+      console.log(`🎬 QUEUE: Queue now has ${animationQueue.current.length} items: [${animationQueue.current.join(', ')}]`);
+
+      // Start processing the queue
+      processAnimationQueue();
+    } else {
+      console.log(`🎬 QUEUE: Skipping duplicate step '${step}'`);
+    }
+  }, [processAnimationQueue]);
 
   // Track when activeStep state actually changes (React render timing)
   useEffect(() => {
@@ -241,41 +304,15 @@ export default function InteractPage() {
               newActiveStep = 'CONSCIENCE';
             } else if (['finalize_action', 'perform_action', 'action_complete', 'round_complete'].includes(stepToProcess)) {
               newActiveStep = 'ACTION_COMPLETE';
-              // Clear any existing timeout
-              if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-              }
-              // Set a timeout to clear after these final steps
-              timeoutRef.current = setTimeout(() => {
-                console.log(`🎨 Clearing active step after completion at ${new Date().toLocaleTimeString()}`);
-                setActiveStep(null);
-                timeoutRef.current = null;
-              }, 2000);
             }
 
             if (newActiveStep) {
-              // Clear any existing timeout when transitioning to a new step (except for final steps)
-              if (!['finalize_action', 'perform_action', 'action_complete', 'round_complete'].includes(stepToProcess)) {
-                if (timeoutRef.current) {
-                  console.log(`🔄 Clearing existing timeout for step transition to ${newActiveStep}`);
-                  clearTimeout(timeoutRef.current);
-                  timeoutRef.current = null;
-                }
-              }
 
               const setStateTime = new Date().toLocaleTimeString();
-              console.log(`🕐 TIMING: Setting active step: ${newActiveStep} (from ${stepToProcess}) at ${setStateTime}`);
-              console.log(`🕐 TIMING: setState() call initiated at ${setStateTime}`);
+              console.log(`🕐 TIMING: Queuing animation step: ${newActiveStep} (from ${stepToProcess}) at ${setStateTime}`);
 
-              setActiveStep(newActiveStep);
-
-              // Record animation trigger time for debugging
-              if (newActiveStep) {
-                setAnimationTriggers(prev => ({
-                  ...prev,
-                  [newActiveStep as string]: setStateTime
-                }));
-              }
+              // Use animation queue instead of direct setState to prevent React batching issues
+              queueAnimationStep(newActiveStep);
 
               console.log(`🕐 TIMING: Animation processing COMPLETE: ${stepToProcess} → ${newActiveStep} at ${new Date().toLocaleTimeString()}`);
             } else {
