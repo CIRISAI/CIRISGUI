@@ -37,6 +37,14 @@ export default function InteractPage() {
   const [taskData, setTaskData] = useState<Map<string, Map<string, any[]>>>(new Map()); // taskId -> thoughtId -> steps
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
+
+  // Animation trigger timestamps for debugging
+  const [animationTriggers, setAnimationTriggers] = useState<{
+    DMAS?: string;
+    ACTION_SELECTION?: string;
+    CONSCIENCE?: string;
+    ACTION_COMPLETE?: string;
+  }>({});
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Corrected step mapping for 4-step visualization (using lowercase to match API)
@@ -209,7 +217,7 @@ export default function InteractPage() {
             console.log(`🎯 Processing step: ${stepToProcess} at ${eventTime}`);
 
             // Determine which SVG circle should be lit based on the step
-            let newActiveStep = null;
+            let newActiveStep: string | null = null;
 
             if (['start_round', 'gather_context'].includes(stepToProcess)) {
               newActiveStep = 'DMAS';
@@ -245,6 +253,14 @@ export default function InteractPage() {
 
               console.log(`🎨 Setting active step: ${newActiveStep} (from ${stepToProcess}) at ${eventTime}`);
               setActiveStep(newActiveStep);
+
+              // Record animation trigger time for debugging
+              if (newActiveStep) {
+                setAnimationTriggers(prev => ({
+                  ...prev,
+                  [newActiveStep as string]: eventTime
+                }));
+              }
             } else {
               console.log(`❓ No animation mapping for step: ${stepToProcess} at ${eventTime}`);
             }
@@ -820,6 +836,19 @@ export default function InteractPage() {
                                 const statusText = success === true ? 'Success' : success === false ? 'Failed' : 'Processing';
                                 const statusColor = success === true ? 'text-green-600' : success === false ? 'text-red-600' : 'text-blue-600';
 
+                                // Determine which animation phase this step belongs to
+                                let animationPhase = null;
+                                if (['start_round', 'gather_context', 'perform_dmas'].includes(stepPoint)) {
+                                  animationPhase = 'DMAS';
+                                } else if (['perform_aspdma', 'recursive_aspdma'].includes(stepPoint)) {
+                                  animationPhase = 'ACTION_SELECTION';
+                                } else if (['conscience_execution', 'recursive_conscience'].includes(stepPoint)) {
+                                  animationPhase = 'CONSCIENCE';
+                                } else if (['finalize_action', 'perform_action', 'action_complete', 'round_complete'].includes(stepPoint)) {
+                                  animationPhase = 'ACTION_COMPLETE';
+                                }
+                                const animationTriggerTime = animationPhase ? animationTriggers[animationPhase as keyof typeof animationTriggers] : null;
+
                                 return (
                                   <div key={index} className="bg-white border rounded p-2">
                                     <div className="flex justify-between items-start mb-2">
@@ -832,9 +861,14 @@ export default function InteractPage() {
                                           <span>{statusIcon}</span>
                                           <span className="hidden sm:inline">{statusText}</span>
                                         </span>
-                                        <span className="text-gray-400">
-                                          {timestamp ? new Date(timestamp).toLocaleTimeString() : ''}
-                                        </span>
+                                        <div className="text-gray-400 text-right">
+                                          <div>Data: {timestamp ? new Date(timestamp).toLocaleTimeString() : 'N/A'}</div>
+                                          {animationTriggerTime && (
+                                            <div className={`text-${animationPhase === activeStep ? 'blue' : 'purple'}-600 font-medium`}>
+                                              Anim: {animationTriggerTime}
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
 
