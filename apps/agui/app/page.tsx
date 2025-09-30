@@ -29,6 +29,19 @@ export default function InteractPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
+  // Simple reasoning visualization state
+  const [reasoningData, setReasoningData] = useState<any[]>([]);
+  const [activeStep, setActiveStep] = useState<string | null>(null);
+  const [reasoningRounds, setReasoningRounds] = useState<Map<number, any[]>>(new Map());
+
+  // Simple step mapping for 4-step visualization
+  const simpleSteps = {
+    'DMAS': ['GATHER_CONTEXT', 'PERFORM_DMAS', 'PERFORM_ASPDMA'],
+    'ACTION_SELECTION': ['FINALIZE_ACTION'],
+    'CONSCIENCE': ['CONSCIENCE_EXECUTION', 'RECURSIVE_CONSCIENCE'],
+    'ACTION_COMPLETE': ['PERFORM_ACTION', 'ACTION_COMPLETE', 'ROUND_COMPLETE']
+  };
+
   // Ensure SDK is configured for the current agent
   useEffect(() => {
     if (currentAgent) {
@@ -36,6 +49,87 @@ export default function InteractPage() {
       const selectedAgentId = localStorage.getItem('selectedAgentId') || currentAgent.agent_id;
       sdkConfigManager.configure(selectedAgentId);
     }
+  }, [currentAgent]);
+
+  // Connect to reasoning stream for simple visualization
+  useEffect(() => {
+    if (!currentAgent) return;
+
+    const token = cirisClient.auth.getAccessToken();
+    if (!token) return;
+
+    const apiBaseUrl = cirisClient.getBaseURL();
+    const streamUrl = `${apiBaseUrl}/v1/system/runtime/reasoning-stream`;
+
+    const connectStream = async () => {
+      try {
+        const response = await fetch(streamUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Stream failed: ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        while (reader) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                // Update simple step visualization
+                if (data.step_point) {
+                  // Find which simple step this belongs to
+                  for (const [simpleStep, detailSteps] of Object.entries(simpleSteps)) {
+                    if (detailSteps.includes(data.step_point)) {
+                      setActiveStep(simpleStep);
+                      setTimeout(() => setActiveStep(null), 2000); // Clear after 2 seconds (8s total cycle)
+                      break;
+                    }
+                  }
+
+                  // Group data by rounds
+                  if (data.round_number !== undefined) {
+                    setReasoningRounds(prev => {
+                      const newMap = new Map(prev);
+                      const roundData = newMap.get(data.round_number) || [];
+                      roundData.push(data);
+                      newMap.set(data.round_number, roundData);
+                      return newMap;
+                    });
+                  } else {
+                    // Add to general reasoning data if no round number
+                    setReasoningData(prev => [...prev.slice(-20), data]); // Keep last 20
+                  }
+                }
+              } catch (e) {
+                // Ignore parsing errors
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Reasoning stream error:', error);
+        // Retry after 5 seconds
+        setTimeout(connectStream, 5000);
+      }
+    };
+
+    connectStream();
   }, [currentAgent]);
 
   // Fetch conversation history - limit to 20 most recent
@@ -276,6 +370,195 @@ export default function InteractPage() {
                   {sendMessage.isPending ? 'Sending...' : 'Send'}
                 </button>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Simple Reasoning Visualization */}
+        {currentAgent && (
+          <div className="mt-6 bg-white shadow rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">CIRIS Reasoning Process</h3>
+
+              {/* Simple Circular SVG */}
+              <div className="flex justify-center mb-6">
+                <svg width="300" height="300" viewBox="0 0 300 300" className="text-gray-600">
+                  {/* Background circle */}
+                  <circle cx="150" cy="150" r="120" fill="none" stroke="#e5e7eb" strokeWidth="2" />
+
+                  {/* DMAS - Top (12 o'clock) */}
+                  <g id="dmas-group">
+                    <circle
+                      cx="150"
+                      cy="30"
+                      r="25"
+                      fill={activeStep === 'DMAS' ? '#ef4444' : '#f3f4f6'}
+                      stroke={activeStep === 'DMAS' ? '#dc2626' : '#9ca3af'}
+                      strokeWidth="3"
+                      className={activeStep === 'DMAS' ? 'animate-pulse' : ''}
+                    />
+                    <text x="150" y="37" textAnchor="middle" className="text-sm font-medium fill-current">
+                      DMAS
+                    </text>
+                    <text x="150" y="10" textAnchor="middle" className="text-xs fill-gray-500">
+                      Memory & Context
+                    </text>
+                  </g>
+
+                  {/* ACTION SELECTION - Right (3 o'clock) */}
+                  <g id="action-selection-group">
+                    <circle
+                      cx="270"
+                      cy="150"
+                      r="25"
+                      fill={activeStep === 'ACTION_SELECTION' ? '#ef4444' : '#f3f4f6'}
+                      stroke={activeStep === 'ACTION_SELECTION' ? '#dc2626' : '#9ca3af'}
+                      strokeWidth="3"
+                      className={activeStep === 'ACTION_SELECTION' ? 'animate-pulse' : ''}
+                    />
+                    <text x="270" y="157" textAnchor="middle" className="text-sm font-medium fill-current">
+                      ACTION
+                    </text>
+                    <text x="270" y="147" textAnchor="middle" className="text-sm font-medium fill-current">
+                      SELECT
+                    </text>
+                    <text x="270" y="190" textAnchor="middle" className="text-xs fill-gray-500">
+                      Choose Response
+                    </text>
+                  </g>
+
+                  {/* CONSCIENCE - Bottom (6 o'clock) */}
+                  <g id="conscience-group">
+                    <circle
+                      cx="150"
+                      cy="270"
+                      r="25"
+                      fill={activeStep === 'CONSCIENCE' ? '#ef4444' : '#f3f4f6'}
+                      stroke={activeStep === 'CONSCIENCE' ? '#dc2626' : '#9ca3af'}
+                      strokeWidth="3"
+                      className={activeStep === 'CONSCIENCE' ? 'animate-pulse' : ''}
+                    />
+                    <text x="150" y="277" textAnchor="middle" className="text-sm font-medium fill-current">
+                      CONSCIENCE
+                    </text>
+                    <text x="150" y="295" textAnchor="middle" className="text-xs fill-gray-500">
+                      Ethical Check
+                    </text>
+                  </g>
+
+                  {/* ACTION COMPLETE - Left (9 o'clock) */}
+                  <g id="action-complete-group">
+                    <circle
+                      cx="30"
+                      cy="150"
+                      r="25"
+                      fill={activeStep === 'ACTION_COMPLETE' ? '#ef4444' : '#f3f4f6'}
+                      stroke={activeStep === 'ACTION_COMPLETE' ? '#dc2626' : '#9ca3af'}
+                      strokeWidth="3"
+                      className={activeStep === 'ACTION_COMPLETE' ? 'animate-pulse' : ''}
+                    />
+                    <text x="30" y="157" textAnchor="middle" className="text-sm font-medium fill-current">
+                      ACTION
+                    </text>
+                    <text x="30" y="147" textAnchor="middle" className="text-sm font-medium fill-current">
+                      COMPLETE
+                    </text>
+                    <text x="30" y="125" textAnchor="middle" className="text-xs fill-gray-500">
+                      Execute & Finish
+                    </text>
+                  </g>
+
+                  {/* Flow arrows */}
+                  <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7"
+                            refX="10" refY="3.5" orient="auto">
+                      <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
+                    </marker>
+                  </defs>
+
+                  {/* DMAS -> ACTION SELECTION */}
+                  <path d="M 175 55 Q 220 80 245 125" fill="none" stroke="#6b7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
+
+                  {/* ACTION SELECTION -> CONSCIENCE */}
+                  <path d="M 245 175 Q 220 220 175 245" fill="none" stroke="#6b7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
+
+                  {/* CONSCIENCE -> ACTION COMPLETE */}
+                  <path d="M 125 245 Q 80 220 55 175" fill="none" stroke="#6b7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
+
+                  {/* ACTION COMPLETE -> DMAS (completing the circle) */}
+                  <path d="M 55 125 Q 80 80 125 55" fill="none" stroke="#6b7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
+                </svg>
+              </div>
+
+              {/* Active step indicator */}
+              {activeStep && (
+                <div className="text-center mb-4">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                    Currently: {activeStep.replace('_', ' ')}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Reasoning Data by Round */}
+        {currentAgent && reasoningRounds.size > 0 && (
+          <div className="mt-6 bg-white shadow rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Reasoning Details by Round ({reasoningRounds.size} rounds)
+              </h3>
+
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {Array.from(reasoningRounds.entries())
+                  .sort(([a], [b]) => b - a) // Most recent rounds first
+                  .slice(0, 5) // Show last 5 rounds
+                  .map(([roundNumber, roundData]) => (
+                    <details key={roundNumber} className="border border-gray-200 rounded-lg">
+                      <summary className="cursor-pointer p-3 bg-gray-50 hover:bg-gray-100 rounded-t-lg">
+                        <span className="font-medium">Round {roundNumber}</span>
+                        <span className="ml-2 text-sm text-gray-500">
+                          ({roundData.length} steps)
+                        </span>
+                      </summary>
+                      <div className="p-3 space-y-2">
+                        {roundData.map((step, index) => (
+                          <div key={index} className="bg-gray-50 rounded p-2">
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="text-sm font-medium text-gray-900">
+                                {step.step_point}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {step.processing_time_ms}ms
+                              </span>
+                            </div>
+                            {step.step_result && (
+                              <details className="text-xs">
+                                <summary className="cursor-pointer text-blue-600 hover:text-blue-800">
+                                  Step Data
+                                </summary>
+                                <pre className="mt-1 p-2 bg-white rounded overflow-x-auto text-xs whitespace-pre-wrap break-words">
+                                  {JSON.stringify(step.step_result, null, 2)}
+                                </pre>
+                              </details>
+                            )}
+                            {step.transparency_data && (
+                              <details className="text-xs mt-1">
+                                <summary className="cursor-pointer text-purple-600 hover:text-purple-800">
+                                  Transparency Data
+                                </summary>
+                                <pre className="mt-1 p-2 bg-purple-50 rounded overflow-x-auto text-xs whitespace-pre-wrap break-words">
+                                  {JSON.stringify(step.transparency_data, null, 2)}
+                                </pre>
+                              </details>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  ))}
+              </div>
             </div>
           </div>
         )}

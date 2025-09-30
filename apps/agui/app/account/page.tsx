@@ -88,15 +88,34 @@ export default function AccountPage() {
                 </div>
 
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">Active</dt>
+                  <dt className="text-sm font-medium text-gray-500">API Role</dt>
                   <dd className="mt-1">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      userInfo.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      userInfo.api_role === 'SYSTEM_ADMIN' ? 'bg-red-100 text-red-800' :
+                      userInfo.api_role === 'AUTHORITY' ? 'bg-purple-100 text-purple-800' :
+                      userInfo.api_role === 'ADMIN' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
                     }`}>
-                      {userInfo.is_active ? 'Active' : 'Inactive'}
+                      {userInfo.api_role}
                     </span>
                   </dd>
                 </div>
+
+                {userInfo.wa_role && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">WA Role</dt>
+                    <dd className="mt-1">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        userInfo.wa_role === 'root' ? 'bg-red-100 text-red-800' :
+                        userInfo.wa_role === 'authority' ? 'bg-purple-100 text-purple-800' :
+                        userInfo.wa_role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {userInfo.wa_role}
+                      </span>
+                    </dd>
+                  </div>
+                )}
 
                 {userInfo.created_at && (
                   <div>
