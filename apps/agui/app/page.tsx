@@ -220,39 +220,18 @@ export default function InteractPage() {
             console.log('❌ No step found in update or thoughts');
           }
 
-            // Group data by rounds
-            if (update.round_number !== undefined) {
-              setReasoningRounds(prev => {
-                const newMap = new Map(prev);
-                const roundData = newMap.get(update.round_number) || [];
-                roundData.push(update);
-                newMap.set(update.round_number, roundData);
-                return newMap;
-              });
-            } else {
-              // Add to general reasoning data if no round number
-              setReasoningData(prev => [...prev.slice(-20), update]); // Keep last 20
-            }
-          }
-
-          // Also check thoughts for step updates
-          if (update.updated_thoughts && Array.isArray(update.updated_thoughts)) {
-            update.updated_thoughts.forEach((thought: any) => {
-              if (thought.current_step) {
-                // Find which simple step this belongs to
-                for (const [simpleStep, detailSteps] of Object.entries(simpleSteps)) {
-                  if (detailSteps.includes(thought.current_step)) {
-                    console.log(`🎨 Setting active step from thought: ${simpleStep} (from thought step ${thought.current_step})`);
-                    setActiveStep(simpleStep);
-                    setTimeout(() => {
-                      console.log(`🎨 Clearing active step from thought: ${simpleStep}`);
-                      setActiveStep(null);
-                    }, 2000);
-                    break;
-                  }
-                }
-              }
+          // Group data by rounds
+          if (update.round_number !== undefined) {
+            setReasoningRounds(prev => {
+              const newMap = new Map(prev);
+              const roundData = newMap.get(update.round_number) || [];
+              roundData.push(update);
+              newMap.set(update.round_number, roundData);
+              return newMap;
             });
+          } else {
+            // Add to general reasoning data if no round number
+            setReasoningData(prev => [...prev.slice(-20), update]); // Keep last 20
           }
 
         } else if (eventType === 'keepalive') {
