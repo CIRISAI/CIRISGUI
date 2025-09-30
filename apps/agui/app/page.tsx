@@ -205,17 +205,37 @@ export default function InteractPage() {
 
           if (stepToProcess) {
             console.log(`🎯 Processing step: ${stepToProcess}`);
-            // Find which simple step this belongs to
-            for (const [simpleStep, detailSteps] of Object.entries(simpleSteps)) {
-              if (detailSteps.includes(stepToProcess)) {
-                console.log(`🎨 Setting active step: ${simpleStep} (from ${stepToProcess})`);
-                setActiveStep(simpleStep);
-                setTimeout(() => {
-                  console.log(`🎨 Clearing active step: ${simpleStep}`);
-                  setActiveStep(null);
-                }, 2000); // Clear after 2 seconds
-                break;
-              }
+
+            // Determine which SVG circle should be lit based on the step
+            let newActiveStep = null;
+
+            if (['start_round', 'gather_context'].includes(stepToProcess)) {
+              newActiveStep = 'DMAS';
+            } else if (['perform_dmas'].includes(stepToProcess)) {
+              newActiveStep = 'DMAS'; // Stay on DMAS until ASPDMA starts
+            } else if (['perform_aspdma', 'recursive_aspdma'].includes(stepToProcess)) {
+              newActiveStep = 'ACTION_SELECTION';
+            } else if (['conscience_execution', 'recursive_conscience'].includes(stepToProcess)) {
+              newActiveStep = 'CONSCIENCE';
+            } else if (['finalize_action'].includes(stepToProcess)) {
+              newActiveStep = 'CONSCIENCE'; // FINALIZE stays on CONSCIENCE
+              // Set a timeout only for finalize_action to clear after 2 seconds
+              setTimeout(() => {
+                console.log(`🎨 Clearing active step after finalize_action`);
+                setActiveStep(null);
+              }, 2000);
+            } else if (['perform_action', 'action_complete', 'round_complete'].includes(stepToProcess)) {
+              newActiveStep = 'ACTION_COMPLETE';
+              // Set a timeout to clear after these final steps
+              setTimeout(() => {
+                console.log(`🎨 Clearing active step after completion`);
+                setActiveStep(null);
+              }, 2000);
+            }
+
+            if (newActiveStep) {
+              console.log(`🎨 Setting active step: ${newActiveStep} (from ${stepToProcess})`);
+              setActiveStep(newActiveStep);
             }
           } else {
             console.log('❌ No step found in update or thoughts');
