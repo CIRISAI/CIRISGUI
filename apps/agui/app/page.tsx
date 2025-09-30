@@ -767,12 +767,44 @@ export default function InteractPage() {
                                     {stepData.context && (
                                       <details className="text-xs mb-2">
                                         <summary className="cursor-pointer text-green-600 hover:text-green-800 font-medium">
-                                          Context Data
+                                          Context Data ({typeof stepData.context === 'string' ? stepData.context.length : 'object'} {typeof stepData.context === 'string' ? 'chars' : 'properties'})
                                         </summary>
-                                        <div className="mt-1 p-2 bg-green-50 rounded text-green-700 break-words">
-                                          {typeof stepData.context === 'string'
-                                            ? stepData.context.substring(0, 500) + (stepData.context.length > 500 ? '...' : '')
-                                            : JSON.stringify(stepData.context, null, 2).substring(0, 500) + '...'}
+                                        <div className="mt-1 p-2 bg-green-50 rounded text-green-700">
+                                          {typeof stepData.context === 'string' ? (
+                                            <div className="space-y-2">
+                                              <div className="text-xs text-green-600 mb-2">String content preview:</div>
+                                              <div className="max-h-32 overflow-y-auto bg-white p-2 rounded border text-xs font-mono break-all">
+                                                {stepData.context.substring(0, 1000)}
+                                                {stepData.context.length > 1000 && '...'}
+                                              </div>
+                                              <details className="mt-2">
+                                                <summary className="cursor-pointer text-green-600 hover:text-green-800 text-xs">
+                                                  View Full String ({stepData.context.length} chars)
+                                                </summary>
+                                                <pre className="mt-1 p-2 bg-white rounded border max-h-64 overflow-auto text-xs whitespace-pre-wrap break-words">
+                                                  {stepData.context}
+                                                </pre>
+                                              </details>
+                                            </div>
+                                          ) : (
+                                            <div className="space-y-2">
+                                              <div className="text-xs text-green-600 mb-2">Object structure:</div>
+                                              <div className="max-h-32 overflow-y-auto bg-white p-2 rounded border">
+                                                <pre className="text-xs whitespace-pre-wrap break-words">
+                                                  {JSON.stringify(stepData.context, null, 2).substring(0, 800)}
+                                                  {JSON.stringify(stepData.context, null, 2).length > 800 && '\n...'}
+                                                </pre>
+                                              </div>
+                                              <details className="mt-2">
+                                                <summary className="cursor-pointer text-green-600 hover:text-green-800 text-xs">
+                                                  View Full Object
+                                                </summary>
+                                                <pre className="mt-1 p-2 bg-white rounded border max-h-64 overflow-auto text-xs whitespace-pre-wrap break-words">
+                                                  {JSON.stringify(stepData.context, null, 2)}
+                                                </pre>
+                                              </details>
+                                            </div>
+                                          )}
                                         </div>
                                       </details>
                                     )}
@@ -780,12 +812,26 @@ export default function InteractPage() {
                                     {stepData.action_result && (
                                       <details className="text-xs mb-2">
                                         <summary className="cursor-pointer text-purple-600 hover:text-purple-800 font-medium">
-                                          Action Result
+                                          Action Result ({stepData.action_result.length} chars)
                                         </summary>
-                                        <div className="mt-1 p-2 bg-purple-50 rounded text-purple-700 break-words">
-                                          {stepData.action_result.length > 300
-                                            ? `${stepData.action_result.substring(0, 300)}...`
-                                            : stepData.action_result}
+                                        <div className="mt-1 p-2 bg-purple-50 rounded text-purple-700">
+                                          <div className="space-y-2">
+                                            <div className="text-xs text-purple-600 mb-2">Content preview:</div>
+                                            <div className="max-h-24 overflow-y-auto bg-white p-2 rounded border text-xs break-words">
+                                              {stepData.action_result.substring(0, 300)}
+                                              {stepData.action_result.length > 300 && '...'}
+                                            </div>
+                                            {stepData.action_result.length > 300 && (
+                                              <details className="mt-2">
+                                                <summary className="cursor-pointer text-purple-600 hover:text-purple-800 text-xs">
+                                                  View Full Content ({stepData.action_result.length} chars)
+                                                </summary>
+                                                <pre className="mt-1 p-2 bg-white rounded border max-h-64 overflow-auto text-xs whitespace-pre-wrap break-words">
+                                                  {stepData.action_result}
+                                                </pre>
+                                              </details>
+                                            )}
+                                          </div>
                                         </div>
                                       </details>
                                     )}
@@ -800,10 +846,26 @@ export default function InteractPage() {
                                     {stepData.action_parameters && (
                                       <details className="text-xs mb-2">
                                         <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 font-medium">
-                                          Action Parameters
+                                          Action Parameters ({stepData.action_parameters.length} chars)
                                         </summary>
-                                        <div className="mt-1 p-2 bg-indigo-50 rounded text-indigo-700 break-words text-xs">
-                                          {stepData.action_parameters}
+                                        <div className="mt-1 p-2 bg-indigo-50 rounded text-indigo-700">
+                                          <div className="space-y-2">
+                                            <div className="text-xs text-indigo-600 mb-2">Parameters preview:</div>
+                                            <div className="max-h-24 overflow-y-auto bg-white p-2 rounded border text-xs break-words font-mono">
+                                              {stepData.action_parameters.substring(0, 200)}
+                                              {stepData.action_parameters.length > 200 && '...'}
+                                            </div>
+                                            {stepData.action_parameters.length > 200 && (
+                                              <details className="mt-2">
+                                                <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 text-xs">
+                                                  View Full Parameters ({stepData.action_parameters.length} chars)
+                                                </summary>
+                                                <pre className="mt-1 p-2 bg-white rounded border max-h-64 overflow-auto text-xs whitespace-pre-wrap break-words">
+                                                  {stepData.action_parameters}
+                                                </pre>
+                                              </details>
+                                            )}
+                                          </div>
                                         </div>
                                       </details>
                                     )}
