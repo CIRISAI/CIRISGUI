@@ -47,6 +47,12 @@ export default function InteractPage() {
   }>({});
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Track when activeStep state actually changes (React render timing)
+  useEffect(() => {
+    const renderTime = new Date().toLocaleTimeString();
+    console.log(`🎭 React RENDER: activeStep changed to '${activeStep}' at ${renderTime}`);
+  }, [activeStep]);
+
   // Corrected step mapping for 4-step visualization (using lowercase to match API)
   const simpleSteps = {
     'DMAS': ['gather_context', 'perform_dmas'],
@@ -168,7 +174,8 @@ export default function InteractPage() {
 
     // Function to process SSE events
     const processSSEEvent = (eventType: string, eventData: string) => {
-      console.log(`🎯 SSE Event received - Type: ${eventType}, Data length: ${eventData.length}`);
+      const wsReceiveTime = new Date().toLocaleTimeString();
+      console.log(`🎯 WebSocket Event received at ${wsReceiveTime} - Type: ${eventType}, Data length: ${eventData.length}`);
 
       try {
         if (eventType === 'connected') {
@@ -176,7 +183,11 @@ export default function InteractPage() {
           setStreamConnected(true);
           setStreamError(null);
         } else if (eventType === 'step_update') {
+          const parseStartTime = new Date().toLocaleTimeString();
           const update = JSON.parse(eventData);
+          const parseEndTime = new Date().toLocaleTimeString();
+
+          console.log(`📊 Step update parsing: Start ${parseStartTime} → End ${parseEndTime}`);
           console.log('📊 Step update received:', {
             thoughtCount: update.updated_thoughts?.length || 0,
             sequence: update.stream_sequence,
@@ -213,8 +224,9 @@ export default function InteractPage() {
           }
 
           if (stepToProcess) {
-            const eventTime = new Date().toLocaleTimeString();
-            console.log(`🎯 Processing step: ${stepToProcess} at ${eventTime}`);
+            const animationStartTime = new Date().toLocaleTimeString();
+            console.log(`🎬 Animation processing START: ${stepToProcess} at ${animationStartTime}`);
+            console.log(`⏱️  Timeline: WebSocket(${wsReceiveTime}) → Parse(${parseStartTime}) → Animation(${animationStartTime})`);
 
             // Determine which SVG circle should be lit based on the step
             let newActiveStep: string | null = null;
@@ -251,18 +263,23 @@ export default function InteractPage() {
                 }
               }
 
-              console.log(`🎨 Setting active step: ${newActiveStep} (from ${stepToProcess}) at ${eventTime}`);
+              const setStateTime = new Date().toLocaleTimeString();
+              console.log(`🎨 Setting active step: ${newActiveStep} (from ${stepToProcess}) at ${setStateTime}`);
+              console.log(`🔥 setState() call initiated at ${setStateTime}`);
+
               setActiveStep(newActiveStep);
 
               // Record animation trigger time for debugging
               if (newActiveStep) {
                 setAnimationTriggers(prev => ({
                   ...prev,
-                  [newActiveStep as string]: eventTime
+                  [newActiveStep as string]: setStateTime
                 }));
               }
+
+              console.log(`🎬 Animation processing COMPLETE: ${stepToProcess} → ${newActiveStep} at ${new Date().toLocaleTimeString()}`);
             } else {
-              console.log(`❓ No animation mapping for step: ${stepToProcess} at ${eventTime}`);
+              console.log(`❓ No animation mapping for step: ${stepToProcess} at ${animationStartTime}`);
             }
           } else {
             console.log('❌ No step found in update or thoughts');
