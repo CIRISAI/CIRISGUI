@@ -33,6 +33,7 @@ export default function InteractPage() {
   const [reasoningData, setReasoningData] = useState<any[]>([]);
   const [activeStep, setActiveStep] = useState<string | null>(null);
   const [conscienceResult, setConscienceResult] = useState<{passed: boolean, reasoning?: string} | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [taskData, setTaskData] = useState<Map<string, Map<string, any[]>>>(new Map()); // taskId -> thoughtId -> steps
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -204,7 +205,8 @@ export default function InteractPage() {
           }
 
           if (stepToProcess) {
-            console.log(`🎯 Processing step: ${stepToProcess}`);
+            const eventTime = new Date().toLocaleTimeString();
+            console.log(`🎯 Processing step: ${stepToProcess} at ${eventTime}`);
 
             // Determine which SVG circle should be lit based on the step
             let newActiveStep = null;
@@ -219,23 +221,44 @@ export default function InteractPage() {
               newActiveStep = 'CONSCIENCE';
             } else if (['finalize_action'].includes(stepToProcess)) {
               newActiveStep = 'CONSCIENCE'; // FINALIZE stays on CONSCIENCE
+              // Clear any existing timeout
+              if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+              }
               // Set a timeout only for finalize_action to clear after 2 seconds
-              setTimeout(() => {
-                console.log(`🎨 Clearing active step after finalize_action`);
+              timeoutRef.current = setTimeout(() => {
+                console.log(`🎨 Clearing active step after finalize_action at ${new Date().toLocaleTimeString()}`);
                 setActiveStep(null);
+                timeoutRef.current = null;
               }, 2000);
             } else if (['perform_action', 'action_complete', 'round_complete'].includes(stepToProcess)) {
               newActiveStep = 'ACTION_COMPLETE';
+              // Clear any existing timeout
+              if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+              }
               // Set a timeout to clear after these final steps
-              setTimeout(() => {
-                console.log(`🎨 Clearing active step after completion`);
+              timeoutRef.current = setTimeout(() => {
+                console.log(`🎨 Clearing active step after completion at ${new Date().toLocaleTimeString()}`);
                 setActiveStep(null);
+                timeoutRef.current = null;
               }, 2000);
             }
 
             if (newActiveStep) {
-              console.log(`🎨 Setting active step: ${newActiveStep} (from ${stepToProcess})`);
+              // Clear any existing timeout when transitioning to a new step (except for final steps)
+              if (!['finalize_action', 'perform_action', 'action_complete', 'round_complete'].includes(stepToProcess)) {
+                if (timeoutRef.current) {
+                  console.log(`🔄 Clearing existing timeout for step transition to ${newActiveStep}`);
+                  clearTimeout(timeoutRef.current);
+                  timeoutRef.current = null;
+                }
+              }
+
+              console.log(`🎨 Setting active step: ${newActiveStep} (from ${stepToProcess}) at ${eventTime}`);
               setActiveStep(newActiveStep);
+            } else {
+              console.log(`❓ No animation mapping for step: ${stepToProcess} at ${eventTime}`);
             }
           } else {
             console.log('❌ No step found in update or thoughts');
