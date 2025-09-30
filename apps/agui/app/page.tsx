@@ -1,23 +1,33 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { cirisClient } from "../lib/ciris-sdk";
-import { sdkConfigManager } from "../lib/sdk-config-manager";
-import Link from "next/link";
-import { ProtectedRoute } from "../components/ProtectedRoute";
-import { useAgent } from "../contexts/AgentContextHybrid";
-import { NoAgentsPlaceholder } from "../components/NoAgentsPlaceholder";
-import {
-  StatusDot,
-  SpinnerIcon,
-  InfoIcon,
-  ClockIcon,
-  MemoryIcon,
-} from "../components/Icons";
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { cirisClient } from '../lib/ciris-sdk';
+import { sdkConfigManager } from '../lib/sdk-config-manager';
+import toast from 'react-hot-toast';
+import { StatusDot } from '../components/Icons';
+import { useAuth } from '../contexts/AuthContext';
+import { useAgent } from '../contexts/AgentContextHybrid';
+import { NoAgentsPlaceholder } from '../components/NoAgentsPlaceholder';
+import { ProtectedRoute } from '../components/ProtectedRoute';
+import { extractErrorMessage, getDiscordInvite } from '../lib/utils/error-helpers';
+import { ErrorModal } from '../components/ErrorModal';
 
-export default function DashboardPage() {
+export default function InteractPage() {
+  const { user } = useAuth();
   const { currentAgent, isLoadingAgents } = useAgent();
+  const [message, setMessage] = useState('');
+  const [showShutdownDialog, setShowShutdownDialog] = useState(false);
+  const [showEmergencyShutdownDialog, setShowEmergencyShutdownDialog] = useState(false);
+  const [shutdownReason, setShutdownReason] = useState('User requested graceful shutdown');
+  const [emergencyReason, setEmergencyReason] = useState('EMERGENCY: Immediate shutdown required');
+  const [errorModal, setErrorModal] = useState<{ isOpen: boolean; message: string; details?: any }>({
+    isOpen: false,
+    message: '',
+    details: undefined
+  });
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   // Ensure SDK is configured for the current agent
   useEffect(() => {
@@ -28,126 +38,131 @@ export default function DashboardPage() {
     }
   }, [currentAgent]);
 
-  // Fetch all necessary data
-  const { data: health } = useQuery({
-    queryKey: ["dashboard-health"],
-    queryFn: () => cirisClient.system.getHealth(),
-    refetchInterval: 5000,
-    enabled: !!currentAgent, // Only run if an agent is selected
-  });
-
-  const { data: resources } = useQuery({
-    queryKey: ["dashboard-resources"],
-    queryFn: () => cirisClient.system.getResources(),
-    refetchInterval: 5000,
+  // Fetch conversation history - limit to 20 most recent
+  const { data: history, isLoading } = useQuery({
+    queryKey: ['conversation-history'],
+    queryFn: async () => {
+      const result = await cirisClient.agent.getHistory({
+        channel_id: 'api_0.0.0.0_8080',
+        limit: 20
+      });
+      return result;
+    },
+    refetchInterval: 2000, // Refresh every 2 seconds to catch responses
     enabled: !!currentAgent,
   });
 
-  // Cast resources to the actual API response structure
-  const resourceData = resources as any;
-
-  const { data: services } = useQuery({
-    queryKey: ["dashboard-services"],
-    queryFn: () => cirisClient.system.getServices(),
-    refetchInterval: 10000,
-    enabled: !!currentAgent,
-  });
-
-  const { data: agentStatus } = useQuery({
-    queryKey: ["dashboard-agent"],
+  // Fetch agent status
+  const { data: status, isError: statusError } = useQuery({
+    queryKey: ['agent-status'],
     queryFn: () => cirisClient.agent.getStatus(),
-    refetchInterval: 5000,
+    refetchInterval: 5000, // Refresh every 5 seconds
     enabled: !!currentAgent,
   });
 
-  const { data: memoryStats } = useQuery({
-    queryKey: ["dashboard-memory"],
-    queryFn: () => cirisClient.memory.getStats(),
-    refetchInterval: 30000,
-    enabled: !!currentAgent,
-  });
-  const { data: status } = useQuery({
-    queryKey: ["agent-status"],
-    queryFn: () => cirisClient.agent.getStatus(),
-    enabled: !!currentAgent,
-  });
-  const { data: runtimeState } = useQuery({
-    queryKey: ["runtime-state"],
-    queryFn: () => cirisClient.system.getRuntimeState(),
-    enabled: !!currentAgent,
-  });
-  const { data: telemetryOverview } = useQuery({
-    queryKey: ["dashboard-telemetry"],
-    queryFn: () => cirisClient.telemetry.getOverview(),
-    refetchInterval: 30000,
-    enabled: !!currentAgent,
+  // Send message mutation
+  const sendMessage = useMutation({
+    mutationFn: async (msg: string) => {
+      const response = await cirisClient.agent.interact(msg, {
+        channel_id: 'api_0.0.0.0_8080'
+      });
+      return response;
+    },
+    onSuccess: (response) => {
+      setMessage('');
+      // Immediately refetch history to show the response
+      queryClient.invalidateQueries({ queryKey: ['conversation-history'] });
+
+      // Show the agent's response in a toast for visibility
+      if (response.response) {
+        toast.success(`Agent: ${response.response}`, { duration: 5000 });
+      }
+    },
+    onError: (error: any) => {
+      console.error('Send message error:', error);
+
+      // Extract error message
+      const errorMessage = extractErrorMessage(error);
+
+      // Show error modal instead of toast
+      setErrorModal({
+        isOpen: true,
+        message: errorMessage,
+        details: error.response?.data || error.details
+      });
+    },
   });
 
-  const { data: recentLogs } = useQuery({
-    queryKey: ["dashboard-logs"],
-    queryFn: () => cirisClient.telemetry.getLogs("ERROR", undefined, 5),
-    refetchInterval: 10000,
-    enabled: !!currentAgent,
+  // Shutdown mutation
+  const shutdownMutation = useMutation({
+    mutationFn: async () => {
+      return await cirisClient.system.shutdown(shutdownReason, true, false);
+    },
+    onSuccess: (response) => {
+      toast.success(`Shutdown initiated: ${response.message}`, { duration: 10000 });
+      setShowShutdownDialog(false);
+      // Refresh status to show shutdown state
+      queryClient.invalidateQueries({ queryKey: ['agent-status'] });
+    },
+    onError: (error: any) => {
+      console.error('Shutdown error:', error);
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage);
+    },
   });
 
-  const { data: runtimeStatus } = useQuery({
-    queryKey: ["dashboard-runtime"],
-    queryFn: () => cirisClient.system.getRuntimeStatus(),
-    refetchInterval: 5000,
-    enabled: !!currentAgent,
+  // Emergency shutdown mutation
+  const emergencyShutdownMutation = useMutation({
+    mutationFn: async () => {
+      return await cirisClient.system.shutdown(emergencyReason, true, true); // force=true
+    },
+    onSuccess: (response) => {
+      toast.success(`EMERGENCY SHUTDOWN INITIATED: ${response.message}`, {
+        duration: 10000,
+        style: {
+          background: '#dc2626',
+          color: 'white',
+        },
+      });
+      setShowEmergencyShutdownDialog(false);
+    },
+    onError: (error: any) => {
+      console.error('Emergency shutdown error:', error);
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage);
+    },
   });
 
-  const { data: queueStatus } = useQuery({
-    queryKey: ["dashboard-queue"],
-    queryFn: () => cirisClient.system.getProcessingQueueStatus(),
-    refetchInterval: 5000,
-    enabled: !!currentAgent,
-  });
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [history]);
 
-  // Helper functions
-  const formatUptime = (seconds: number) => {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${days}d ${hours}h ${minutes}m`;
-  };
-
-  const getHealthColor = (status: string) => {
-    switch (status) {
-      case "healthy":
-        return "green";
-      case "degraded":
-        return "yellow";
-      case "unhealthy":
-        return "red";
-      default:
-        return "gray";
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (message.trim()) {
+      sendMessage.mutate(message.trim());
     }
   };
 
-  // The SDK already unwraps the data, so services IS the data object
-  const serviceStats = {
-    healthy:
-      services?.services?.filter((s: any) => s.healthy === true).length || 0,
-    degraded:
-      services?.services?.filter(
-        (s: any) => s.healthy === false && s.available === true
-      ).length || 0,
-    unhealthy:
-      services?.services?.filter((s: any) => s.available === false).length || 0,
-    total: services?.total_services || 0,
-  };
+  // Get messages and ensure proper order (oldest to newest)
+  const messages = useMemo(() => {
+    if (!history?.messages) return [];
+
+    // Sort by timestamp (oldest first) and take last 20
+    return [...history.messages]
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .slice(-20);
+  }, [history]);
 
   return (
     <ProtectedRoute>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            CIRIS System Dashboard
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900">Interact with CIRIS</h1>
           <p className="mt-2 text-lg text-gray-600">
-            Real-time monitoring of all system components
+            Chat with your CIRIS agent in real-time
           </p>
         </div>
 
@@ -156,606 +171,239 @@ export default function DashboardPage() {
           <NoAgentsPlaceholder />
         )}
 
-        {/* Only show dashboard content if agent is selected */}
+        {/* Only show chat interface if agent is selected */}
         {currentAgent && (
-          <>
-
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          {/* System Health */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <StatusDot
-                    status={getHealthColor(health?.status || "gray")}
-                    className="h-8 w-8"
-                  />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      System Health
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900">
-                      {health?.status?.toUpperCase() || "UNKNOWN"}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Agent State */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-3 bg-indigo-100 rounded-lg">
-                    <InfoIcon className="text-indigo-600" size="lg" />
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Agent State
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900">
-                      {agentStatus?.cognitive_state || "UNKNOWN"}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Uptime */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-3 bg-green-100 rounded-lg">
-                    <ClockIcon className="text-green-600" size="lg" />
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Uptime
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900">
-                      {health?.uptime_seconds
-                        ? formatUptime(health.uptime_seconds)
-                        : "N/A"}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Memory Nodes */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="p-3 bg-purple-100 rounded-lg">
-                    <MemoryIcon className="text-purple-600" size="lg" />
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Memory Nodes
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900">
-                      {memoryStats?.total_nodes?.toLocaleString() || "0"}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Quick Links */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
-              Quick Access
-            </h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Link
-                href="/dashboard"
-                className="relative rounded-lg border border-blue-300 bg-blue-50 px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-blue-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                <div className="flex-1 min-w-0">
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  <p className="text-sm font-medium text-blue-900">
-                    System Dashboard
-                  </p>
-                  <p className="text-sm text-blue-700 truncate">
-                    Real-time system monitoring
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href="/api-demo"
-                className="relative rounded-lg border border-indigo-300 bg-indigo-50 px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-indigo-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                <div className="flex-1 min-w-0">
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  <p className="text-sm font-medium text-indigo-900">
-                    API Explorer
-                  </p>
-                  <p className="text-sm text-indigo-700 truncate">
-                    Interactive API demonstration
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href="/comms"
-                className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                <div className="flex-1 min-w-0">
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  <p className="text-sm font-medium text-gray-900">
-                    Communications
-                  </p>
-                  <p className="text-sm text-gray-500 truncate">
-                    Chat with the agent
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href="/system"
-                className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                <div className="flex-1 min-w-0">
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  <p className="text-sm font-medium text-gray-900">
-                    System Status
-                  </p>
-                  <p className="text-sm text-gray-500 truncate">
-                    Monitor health & resources
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href="/memory"
-                className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                <div className="flex-1 min-w-0">
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  <p className="text-sm font-medium text-gray-900">
-                    Memory Graph
-                  </p>
-                  <p className="text-sm text-gray-500 truncate">
-                    Explore agent memories
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                href="/audit"
-                className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                <div className="flex-1 min-w-0">
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  <p className="text-sm font-medium text-gray-900">
-                    Audit Trail
-                  </p>
-                  <p className="text-sm text-gray-500 truncate">
-                    View system activity
-                  </p>
-                </div>
-              </Link>
-            </div>
-          </div>
-        </div>
-        {/* Agent Status */}
-        {status && (
-          <div className="bg-white shadow rounded-lg my-8">
+          <div className="bg-white shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                Agent Status
-              </h2>
-              <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Name</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {status.agent_id}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">State</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    <span
-                      className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
-                        runtimeState?.processor_state === "paused"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-green-100 text-green-800"
-                      }`}>
-                      {status.cognitive_state}{" "}
-                      {runtimeState?.processor_state === "paused" && "(Paused)"}
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Agent Communications
+                </h3>
+                <div className="flex items-center space-x-4 text-sm">
+                  <span className={`flex items-center ${!statusError && status ? 'text-green-600' : 'text-red-600'}`}>
+                    <StatusDot status={!statusError && status ? 'green' : 'red'} className="mr-2" />
+                    {!statusError && status ? 'Connected' : 'Disconnected'}
+                  </span>
+                  {status && (
+                    <span className="text-gray-600">
+                      State: <span className="font-medium">{status.cognitive_state}</span>
                     </span>
-                  </dd>
+                  )}
+                  <button
+                    onClick={() => setShowShutdownDialog(true)}
+                    className="ml-4 px-3 py-1 text-xs font-medium text-red-600 border border-red-600 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    Shutdown
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Check if user has permission (ADMIN or higher)
+                      if (user?.role === 'OBSERVER') {
+                        toast.error('WISE AUTHORITY OR SYSTEM AUTHORITY REQUIRED', {
+                          duration: 5000,
+                          style: {
+                            background: '#dc2626',
+                            color: 'white',
+                          },
+                        });
+                      } else {
+                        setShowEmergencyShutdownDialog(true);
+                      }
+                    }}
+                    className="ml-2 px-3 py-1 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    EMERGENCY STOP
+                  </button>
                 </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Uptime</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {Math.floor(status.uptime_seconds / 3600)}h{" "}
-                    {Math.floor((status.uptime_seconds % 3600) / 60)}m
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">
-                    Processor Status
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900 capitalize">
-                    {runtimeState?.processor_state || "Unknown"}
-                  </dd>
-                </div>
-              </dl>
+              </div>
+
+              {/* Messages */}
+              <div className="border rounded-lg bg-gray-50 h-96 overflow-y-auto p-4 mb-4">
+                {isLoading ? (
+                  <div className="text-center text-gray-500">Loading conversation...</div>
+                ) : messages.length === 0 ? (
+                  <div className="text-center text-gray-500">No messages yet. Start a conversation!</div>
+                ) : (
+                  <div className="space-y-3">
+                    {messages.map((msg, idx) => {
+                      // Debug log to see message structure
+                      if (idx === 0) console.log('Message structure:', msg);
+
+                      return (
+                        <div
+                          key={msg.id || idx}
+                          className={`flex ${msg.is_agent ? 'justify-start' : 'justify-end'}`}
+                        >
+                          <div
+                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                              msg.is_agent
+                                ? 'bg-white border border-gray-200'
+                                : 'bg-blue-600 text-white'
+                            }`}
+                          >
+                            <div className={`text-xs mb-1 ${msg.is_agent ? 'text-gray-500' : 'text-blue-100'}`}>
+                              {msg.author || (msg.is_agent ? 'CIRIS' : 'You')} • {new Date(msg.timestamp).toLocaleTimeString()}
+                            </div>
+                            <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
+                )}
+              </div>
+
+              <div className="text-xs text-gray-500 mb-2">
+                Showing last 20 messages
+              </div>
+
+              {/* Input form */}
+              <form onSubmit={handleSubmit} className="flex space-x-3">
+                <input
+                  type="text"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Type your message..."
+                  disabled={sendMessage.isPending}
+                  className="flex-1 min-w-0 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={sendMessage.isPending || !message.trim()}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sendMessage.isPending ? 'Sending...' : 'Send'}
+                </button>
+              </form>
             </div>
           </div>
         )}
-        {/* Resource Usage */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-8">
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Current Resource Usage
-              </h3>
-              <div className="space-y-4">
-                {/* CPU Usage */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-medium text-gray-700">
-                      CPU Usage
-                    </span>
-                    <span
-                      className={`text-sm font-bold ${
-                        (resourceData?.current_usage?.cpu_percent || 0) > 80
-                          ? "text-red-600"
-                          : (resourceData?.current_usage?.cpu_percent || 0) > 60
-                          ? "text-yellow-600"
-                          : "text-green-600"
-                      }`}>
-                      {resourceData?.current_usage?.cpu_percent?.toFixed(1) ||
-                        0}
-                      %
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        (resourceData?.current_usage?.cpu_percent || 0) > 80
-                          ? "bg-red-500"
-                          : (resourceData?.current_usage?.cpu_percent || 0) > 60
-                          ? "bg-yellow-500"
-                          : "bg-green-500"
-                      }`}
-                      style={{
-                        width: `${
-                          resourceData?.current_usage?.cpu_percent || 0
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </div>
 
-                {/* Memory Usage */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-medium text-gray-700">
-                      Memory Usage
-                    </span>
-                    <span
-                      className={`text-sm font-bold ${
-                        (resourceData?.current_usage?.memory_percent || 0) > 80
-                          ? "text-red-600"
-                          : (resourceData?.current_usage?.memory_percent || 0) >
-                            60
-                          ? "text-yellow-600"
-                          : "text-green-600"
-                      }`}>
-                      {resourceData?.current_usage?.memory_mb || 0} MB (
-                      {resourceData?.current_usage?.memory_percent?.toFixed(
-                        1
-                      ) || 0}
-                      %)
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        (resourceData?.current_usage?.memory_percent || 0) > 80
-                          ? "bg-red-500"
-                          : (resourceData?.current_usage?.memory_percent || 0) >
-                            60
-                          ? "bg-yellow-500"
-                          : "bg-green-500"
-                      }`}
-                      style={{
-                        width: `${
-                          resourceData?.current_usage?.memory_percent || 0
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Disk Usage */}
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">
-                    Disk Usage
-                  </span>
-                  <span className="text-sm font-bold text-gray-900">
-                    {resourceData?.current_usage?.disk_used_mb
-                      ? `${(
-                          resourceData.current_usage.disk_used_mb / 1024
-                        ).toFixed(1)} GB`
-                      : "N/A"}
-                  </span>
-                </div>
-              </div>
-            </div>
+        {/* Debug info */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
+            <p>Total messages in history: {history?.total_count || 0}</p>
+            <p>Showing: {messages.length} messages</p>
+            <p>Channel: api_0.0.0.0_8080</p>
           </div>
+        )}
 
-          {/* Environmental Impact */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
+        {/* Shutdown Confirmation Dialog */}
+        {showShutdownDialog && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Environmental Impact
+                Initiate Graceful Shutdown
               </h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-700">
-                    {telemetryOverview?.carbon_24h_grams
-                      ? (telemetryOverview.carbon_24h_grams / 1000).toFixed(3)
-                      : "0.000"}
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1">kg CO₂ (24h)</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-700">
-                    {telemetryOverview?.tokens_last_hour
-                      ? telemetryOverview.tokens_last_hour.toLocaleString()
-                      : "0"}
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1">Tokens/hour</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-700">
-                    $
-                    {telemetryOverview?.cost_24h_cents
-                      ? (telemetryOverview.cost_24h_cents / 100).toFixed(2)
-                      : "0.00"}
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1">Cost (24h)</div>
-                </div>
+              <p className="text-sm text-gray-600 mb-4">
+                This will initiate a graceful shutdown of the CIRIS agent. The agent will:
+              </p>
+              <ul className="list-disc list-inside text-sm text-gray-600 mb-4 space-y-1">
+                <li>Transition to SHUTDOWN cognitive state</li>
+                <li>Complete any critical tasks</li>
+                <li>May send final messages to channels</li>
+                <li>Perform clean shutdown procedures</li>
+              </ul>
+              <div className="mb-4">
+                <label htmlFor="shutdown-reason" className="block text-sm font-medium text-gray-700 mb-2">
+                  Shutdown Reason
+                </label>
+                <textarea
+                  id="shutdown-reason"
+                  rows={3}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  value={shutdownReason}
+                  onChange={(e) => setShutdownReason(e.target.value)}
+                  placeholder="Enter reason for shutdown..."
+                />
               </div>
-              <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Hourly Rate:</span>
-                  <span className="ml-2 font-medium">
-                    $
-                    {telemetryOverview?.cost_last_hour_cents
-                      ? (telemetryOverview.cost_last_hour_cents / 100).toFixed(
-                          2
-                        )
-                      : "0.00"}
-                    /hr
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Carbon Rate:</span>
-                  <span className="ml-2 font-medium">
-                    {telemetryOverview?.carbon_last_hour_grams?.toFixed(1) ||
-                      "0.0"}
-                    g/hr
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Service Health Summary */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Service Health Distribution
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <StatusDot status="green" className="h-5 w-5" />
-                    <span className="ml-2 text-sm font-medium text-gray-700">
-                      Healthy Services
-                    </span>
-                  </div>
-                  <span className="text-lg font-semibold text-green-600">
-                    {serviceStats.healthy}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <StatusDot status="yellow" className="h-5 w-5" />
-                    <span className="ml-2 text-sm font-medium text-gray-700">
-                      Degraded Services
-                    </span>
-                  </div>
-                  <span className="text-lg font-semibold text-yellow-600">
-                    {serviceStats.degraded}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <StatusDot status="red" className="h-5 w-5" />
-                    <span className="ml-2 text-sm font-medium text-gray-700">
-                      Unhealthy Services
-                    </span>
-                  </div>
-                  <span className="text-lg font-semibold text-red-600">
-                    {serviceStats.unhealthy}
-                  </span>
-                </div>
-                <div className="pt-2 mt-2 border-t border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                      Total Services
-                    </span>
-                    <span className="text-lg font-semibold text-gray-900">
-                      {serviceStats.total}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Runtime & Queue Status */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-8">
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Runtime Status
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Runtime State</span>
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      runtimeStatus?.is_paused
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-green-100 text-green-800"
-                    }`}>
-                    {runtimeStatus?.is_paused ? "PAUSED" : "RUNNING"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Processing Queue
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Queue Size</span>
-                  <span className="text-lg font-semibold">
-                    {queueStatus?.queue_size || 0}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Max Size</span>
-                  <span className="text-sm font-medium">
-                    {queueStatus?.max_size || "N/A"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Telemetry
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Total Metrics</span>
-                  <span className="text-lg font-semibold">
-                    {telemetryOverview?.total_metrics?.toLocaleString() || "0"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Active Services</span>
-                  <span className="text-sm font-medium">
-                    {telemetryOverview?.active_services || 0}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Error Logs */}
-        {recentLogs && recentLogs.length > 0 && (
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Recent Errors
-              </h3>
-              <div className="space-y-2">
-                {recentLogs.map((log: any, index: number) => (
-                  <div
-                    key={index}
-                    className="flex items-start space-x-3 p-3 bg-red-50 rounded-lg">
-                    <div className="flex-shrink-0">
-                      <StatusDot status="red" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-red-900">
-                        {log.service} - {log.level}
-                      </p>
-                      <p className="text-sm text-red-700 truncate">
-                        {log.message}
-                      </p>
-                      <p className="text-xs text-red-600 mt-1">
-                        {new Date(log.timestamp).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowShutdownDialog(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => shutdownMutation.mutate()}
+                  disabled={shutdownMutation.isPending || !shutdownReason.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {shutdownMutation.isPending ? 'Initiating...' : 'Confirm Shutdown'}
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Quick Actions */}
-        <div className="mt-8 bg-blue-50 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-blue-900 mb-4">
-            Quick Links
-          </h3>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <a
-              href="/api-demo"
-              className="text-center p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow">
-              <div className="text-2xl mb-2">🚀</div>
-              <div className="text-sm font-medium text-gray-900">
-                API Explorer
+        {/* Emergency Shutdown Dialog */}
+        {showEmergencyShutdownDialog && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full border-4 border-red-600">
+              <h3 className="text-lg font-bold text-red-600 mb-4 flex items-center">
+                <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                EMERGENCY SHUTDOWN
+              </h3>
+              <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+                <p className="text-sm font-semibold text-red-800 mb-2">
+                  ⚠️ WARNING: This will IMMEDIATELY terminate the agent!
+                </p>
+                <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                  <li>NO graceful shutdown procedures</li>
+                  <li>NO task completion</li>
+                  <li>NO final messages</li>
+                  <li>IMMEDIATE process termination</li>
+                </ul>
               </div>
-            </a>
-            <a
-              href="/system"
-              className="text-center p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow">
-              <div className="text-2xl mb-2">⚙️</div>
-              <div className="text-sm font-medium text-gray-900">
-                System Status
+              <div className="mb-4">
+                <label htmlFor="emergency-reason" className="block text-sm font-medium text-gray-700 mb-2">
+                  Emergency Reason (Required)
+                </label>
+                <textarea
+                  id="emergency-reason"
+                  rows={2}
+                  className="block w-full rounded-md border-red-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm"
+                  value={emergencyReason}
+                  onChange={(e) => setEmergencyReason(e.target.value)}
+                  placeholder="Describe the emergency..."
+                />
               </div>
-            </a>
-            <a
-              href="/memory"
-              className="text-center p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow">
-              <div className="text-2xl mb-2">🧠</div>
-              <div className="text-sm font-medium text-gray-900">
-                Memory Graph
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                <p className="text-xs text-yellow-800">
+                  <strong>Authority Required:</strong> This action requires ADMIN, AUTHORITY, or SYSTEM_ADMIN role.
+                  Your current role: <span className="font-semibold">{user?.role || 'Unknown'}</span>
+                </p>
               </div>
-            </a>
-            <a
-              href="/config"
-              className="text-center p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow">
-              <div className="text-2xl mb-2">🔧</div>
-              <div className="text-sm font-medium text-gray-900">
-                Configuration
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowEmergencyShutdownDialog(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => emergencyShutdownMutation.mutate()}
+                  disabled={emergencyShutdownMutation.isPending || !emergencyReason.trim()}
+                  className="px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {emergencyShutdownMutation.isPending ? 'TERMINATING...' : 'EXECUTE EMERGENCY STOP'}
+                </button>
               </div>
-            </a>
+            </div>
           </div>
-        </div>
-        </>
         )}
+
+        {/* Error Modal */}
+        <ErrorModal
+          isOpen={errorModal.isOpen}
+          onClose={() => setErrorModal({ isOpen: false, message: '', details: undefined })}
+          title="Communication Error"
+          message={errorModal.message}
+          details={errorModal.details}
+        />
       </div>
     </ProtectedRoute>
   );

@@ -22,13 +22,11 @@ function Navbar({ className }: { className?: string }) {
   const router = useRouter();
   const [active, setActive] = useState<string | null>(null);
 
-  const navigation = [{ name: "Home", href: "/", minRole: "OBSERVER" }];
-  const navigation2 = [
+  const navigation = [{ name: "Interact", href: "/", minRole: "OBSERVER" }];
+  const systemNavigation = [
     { name: "API Explorer", href: "/api-demo", minRole: "OBSERVER" },
     { name: "API Docs", href: "/docs", minRole: "OBSERVER" },
-  ];
-  const navigation3 = [
-    { name: "Communications", href: "/comms", minRole: "OBSERVER" },
+    { name: "Dashboard", href: "/dashboard", minRole: "OBSERVER" },
     { name: "Memory", href: "/memory", minRole: "OBSERVER" },
     { name: "Audit", href: "/audit", minRole: "OBSERVER" },
     { name: "Logs", href: "/logs", minRole: "OBSERVER" },
@@ -38,33 +36,17 @@ function Navbar({ className }: { className?: string }) {
     { name: "Config", href: "/config", minRole: "ADMIN" },
     { name: "Consent", href: "/consent", minRole: "OBSERVER" },
     { name: "Users", href: "/users", minRole: "ADMIN" },
-    { name: "WA", href: "/wa", minRole: "OBSERVER" }, // Will be filtered by the page itself based on ADMIN or AUTHORITY role
+    { name: "WA", href: "/wa", minRole: "OBSERVER" },
   ];
-  const navigation4 = [
-    { name: "Dashboard", href: "/dashboard", minRole: "OBSERVER" },
-    { name: "API Explorer", href: "/api-demo", minRole: "OBSERVER" },
-    { name: "API Docs", href: "/docs", minRole: "OBSERVER" },
-    { name: "Home", href: "/", minRole: "OBSERVER" },
-    { name: "Communications", href: "/comms", minRole: "OBSERVER" },
-    { name: "Memory", href: "/memory", minRole: "OBSERVER" },
-    { name: "Audit", href: "/audit", minRole: "OBSERVER" },
-    { name: "Logs", href: "/logs", minRole: "OBSERVER" },
-    { name: "Tools", href: "/tools", minRole: "OBSERVER" },
-    { name: "System", href: "/system", minRole: "OBSERVER" },
-    { name: "Config", href: "/config", minRole: "ADMIN" },
-    { name: "Consent", href: "/consent", minRole: "OBSERVER" },
-    { name: "Users", href: "/users", minRole: "ADMIN" },
-    { name: "WA", href: "/wa", minRole: "OBSERVER" }, // Will be filtered by the page itself based on ADMIN or AUTHORITY role
+  const accountNavigation = [
+    { name: "Account", href: "/account", minRole: "OBSERVER" },
   ];
 
   const visibleNavigation = navigation.filter((item) => hasRole(item.minRole));
-  const visibleNavigation2 = navigation2.filter((item) =>
+  const visibleSystemNavigation = systemNavigation.filter((item) =>
     hasRole(item.minRole)
   );
-  const visibleNavigation3 = navigation3.filter((item) =>
-    hasRole(item.minRole)
-  );
-  const visibleNavigation4 = navigation4.filter((item) =>
+  const visibleAccountNavigation = accountNavigation.filter((item) =>
     hasRole(item.minRole)
   );
   return (
@@ -81,9 +63,9 @@ function Navbar({ className }: { className?: string }) {
             {item.name}
           </Link>
         ))}
-        <MenuItem setActive={setActive} active={active} item="Api">
-          <div className="flex flex-col space-y-4 justify-around text-sm">
-            {visibleNavigation2.map((item) => (
+        <MenuItem setActive={setActive} active={active} item="System">
+          <div className="flex flex-col space-y-4 text-sm">
+            {visibleSystemNavigation.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
@@ -92,10 +74,10 @@ function Navbar({ className }: { className?: string }) {
               </Link>
             ))}
           </div>
-        </MenuItem>{" "}
-        <MenuItem setActive={setActive} active={active} item="Services">
+        </MenuItem>
+        <MenuItem setActive={setActive} active={active} item="Account">
           <div className="flex flex-col space-y-4 text-sm">
-            {visibleNavigation3.map((item) => (
+            {visibleAccountNavigation.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
@@ -124,26 +106,6 @@ export function Layout({ children }: LayoutProps) {
   const { user, logout, hasRole } = useAuth();
   const { currentAgent, currentAgentRole, agents } = useAgent();
   const router = useRouter();
-
-  const navigation = [
-    { name: "Dashboard", href: "/dashboard", minRole: "OBSERVER" },
-    { name: "API Explorer", href: "/api-demo", minRole: "OBSERVER" },
-    { name: "API Docs", href: "/docs", minRole: "OBSERVER" },
-    { name: "Home", href: "/", minRole: "OBSERVER" },
-    { name: "Communications", href: "/comms", minRole: "OBSERVER" },
-    { name: "Memory", href: "/memory", minRole: "OBSERVER" },
-    { name: "Audit", href: "/audit", minRole: "OBSERVER" },
-    { name: "Logs", href: "/logs", minRole: "OBSERVER" },
-    { name: "Tools", href: "/tools", minRole: "OBSERVER" },
-    { name: "System", href: "/system", minRole: "OBSERVER" },
-    { name: "Runtime Control", href: "/runtime", minRole: "OBSERVER" },
-    { name: "Config", href: "/config", minRole: "ADMIN" },
-    { name: "Consent", href: "/consent", minRole: "OBSERVER" },
-    { name: "Users", href: "/users", minRole: "ADMIN" },
-    { name: "WA", href: "/wa", minRole: "OBSERVER" }, // Will be filtered by the page itself based on ADMIN or AUTHORITY role
-  ];
-
-  const visibleNavigation = navigation.filter((item) => hasRole(item.minRole));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -185,13 +147,6 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => logout()}
-                  className="text-sm bg-brand-primary border-brand-primary transition-all duration-300 cursor-pointer px-4 py-1 rounded-xs text-white hover:bg-gray-700">
-                  Logout
-                </button>
-              </div>
             </div>
           )}
           {children}
