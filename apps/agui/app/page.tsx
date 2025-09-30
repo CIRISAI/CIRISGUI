@@ -32,6 +32,7 @@ export default function InteractPage() {
   // Simple reasoning visualization state
   const [reasoningData, setReasoningData] = useState<any[]>([]);
   const [activeStep, setActiveStep] = useState<string | null>(null);
+  const [conscienceResult, setConscienceResult] = useState<{passed: boolean, reasoning?: string} | null>(null);
   const [taskData, setTaskData] = useState<Map<string, Map<string, any[]>>>(new Map()); // taskId -> thoughtId -> steps
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -273,6 +274,22 @@ export default function InteractPage() {
                 },
                 status: thought.status
               });
+
+              // Check for conscience results
+              if (currentStep === 'conscience_execution' || currentStep === 'finalize_action') {
+                if (thought.conscience_passed !== undefined || thought.selection_reasoning) {
+                  console.log(`🎯 Conscience result detected: passed=${thought.conscience_passed}, reasoning available=${!!thought.selection_reasoning}`);
+                  setConscienceResult({
+                    passed: thought.conscience_passed === true,
+                    reasoning: thought.selection_reasoning
+                  });
+
+                  // Clear conscience result after 5 seconds
+                  setTimeout(() => {
+                    setConscienceResult(null);
+                  }, 5000);
+                }
+              }
 
               console.log(`📊 Task ${taskId} now has ${taskMap.size} thoughts, thought ${thoughtId} has ${thoughtSteps.length} steps`);
               return newMap;
@@ -667,6 +684,27 @@ export default function InteractPage() {
 
                   {/* ACTION COMPLETE -> DMAS (completing the circle) */}
                   <path d="M 55 125 Q 80 80 125 55" fill="none" stroke="#6b7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
+
+                  {/* Conscience Result Indicator - Center */}
+                  {conscienceResult && (
+                    <g id="conscience-result">
+                      <circle
+                        cx="150"
+                        cy="150"
+                        r="18"
+                        fill={conscienceResult.passed ? '#10b981' : '#f59e0b'}
+                        stroke={conscienceResult.passed ? '#059669' : '#d97706'}
+                        strokeWidth="3"
+                        className="animate-pulse"
+                      />
+                      <text x="150" y="157" textAnchor="middle" className="text-lg font-bold fill-white">
+                        {conscienceResult.passed ? '✓' : '!'}
+                      </text>
+                      <text x="150" y="185" textAnchor="middle" className="text-xs fill-gray-600">
+                        Conscience: {conscienceResult.passed ? 'PASSED' : 'ALERT'}
+                      </text>
+                    </g>
+                  )}
                 </svg>
               </div>
 
@@ -689,6 +727,23 @@ export default function InteractPage() {
                   Active: {activeStep || 'none'}
                 </div>
               </div>
+
+              {/* Conscience Result Display */}
+              {conscienceResult && conscienceResult.reasoning && (
+                <div className={`mt-4 p-4 rounded-lg border-2 ${conscienceResult.passed ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                  <div className="flex items-center mb-2">
+                    <span className={`text-lg mr-2 ${conscienceResult.passed ? 'text-green-600' : 'text-yellow-600'}`}>
+                      {conscienceResult.passed ? '✅' : '⚠️'}
+                    </span>
+                    <h4 className={`font-medium ${conscienceResult.passed ? 'text-green-800' : 'text-yellow-800'}`}>
+                      Conscience Decision: {conscienceResult.passed ? 'APPROVED' : 'FLAGGED'}
+                    </h4>
+                  </div>
+                  <div className={`text-sm ${conscienceResult.passed ? 'text-green-700' : 'text-yellow-700'}`}>
+                    <strong>Reasoning:</strong> {conscienceResult.reasoning}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -841,6 +896,22 @@ export default function InteractPage() {
                                         <div className="font-medium text-yellow-800 mb-1">Selected Action</div>
                                         <div className="text-yellow-700">{stepData.selected_action}</div>
                                       </div>
+                                    )}
+
+                                    {stepData.selection_reasoning && (
+                                      <details className="text-xs mb-2">
+                                        <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium">
+                                          🎯 Conscience Reasoning ({stepData.selection_reasoning.length} chars)
+                                        </summary>
+                                        <div className="mt-1 p-3 bg-blue-50 rounded text-blue-700">
+                                          <div className="space-y-2">
+                                            <div className="text-xs text-blue-600 mb-2">Decision rationale:</div>
+                                            <div className="bg-white p-2 rounded border text-sm leading-relaxed">
+                                              {stepData.selection_reasoning}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </details>
                                     )}
 
                                     {stepData.action_parameters && (
