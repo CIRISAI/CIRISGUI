@@ -219,19 +219,7 @@ export default function InteractPage() {
               newActiveStep = 'ACTION_SELECTION';
             } else if (['conscience_execution', 'recursive_conscience'].includes(stepToProcess)) {
               newActiveStep = 'CONSCIENCE';
-            } else if (['finalize_action'].includes(stepToProcess)) {
-              newActiveStep = 'CONSCIENCE'; // FINALIZE stays on CONSCIENCE
-              // Clear any existing timeout
-              if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-              }
-              // Set a timeout only for finalize_action to clear after 2 seconds
-              timeoutRef.current = setTimeout(() => {
-                console.log(`🎨 Clearing active step after finalize_action at ${new Date().toLocaleTimeString()}`);
-                setActiveStep(null);
-                timeoutRef.current = null;
-              }, 2000);
-            } else if (['perform_action', 'action_complete', 'round_complete'].includes(stepToProcess)) {
+            } else if (['finalize_action', 'perform_action', 'action_complete', 'round_complete'].includes(stepToProcess)) {
               newActiveStep = 'ACTION_COMPLETE';
               // Clear any existing timeout
               if (timeoutRef.current) {
@@ -698,10 +686,10 @@ export default function InteractPage() {
                       className={activeStep === 'ACTION_COMPLETE' ? 'animate-pulse' : ''}
                     />
                     <text x="30" y="157" textAnchor="middle" className="text-sm font-medium fill-current">
-                      ACTION
+                      PERFORM
                     </text>
                     <text x="30" y="147" textAnchor="middle" className="text-sm font-medium fill-current">
-                      COMPLETE
+                      ACTION
                     </text>
                     <text x="30" y="125" textAnchor="middle" className="text-xs fill-gray-500">
                       Execute & Finish
