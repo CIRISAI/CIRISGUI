@@ -29,7 +29,7 @@ export default function AccountPage() {
   // Fetch current user details including OAuth links
   const { data: userDetails } = useQuery({
     queryKey: ['user-details', userInfo?.user_id],
-    queryFn: () => cirisClient.users.getUser(userInfo!.user_id),
+    queryFn: () => cirisClient.users.get(userInfo!.user_id),
     enabled: !!userInfo?.user_id,
   });
 
@@ -318,7 +318,7 @@ export default function AccountPage() {
 
             {userDetails?.linked_oauth_accounts && userDetails.linked_oauth_accounts.length > 0 ? (
               <div className="space-y-3">
-                {userDetails.linked_oauth_accounts.map((account, index) => (
+                {userDetails.linked_oauth_accounts.map((account: any, index: number) => (
                   <div
                     key={`${account.provider}-${account.external_id}`}
                     className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
