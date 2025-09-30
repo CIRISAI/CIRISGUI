@@ -37,11 +37,11 @@ export default function InteractPage() {
   const [streamError, setStreamError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Simple step mapping for 4-step visualization (using lowercase to match API)
+  // Better step mapping for 4-step visualization (using lowercase to match API)
   const simpleSteps = {
-    'DMAS': ['gather_context', 'perform_dmas', 'perform_aspdma'],
-    'ACTION_SELECTION': ['finalize_action'],
-    'CONSCIENCE': ['conscience_execution', 'recursive_conscience', 'recursive_aspdma'],
+    'DMAS': ['gather_context', 'perform_dmas'],
+    'ACTION_SELECTION': ['perform_aspdma', 'finalize_action'],
+    'CONSCIENCE': ['conscience_execution', 'recursive_aspdma', 'recursive_conscience'],
     'ACTION_COMPLETE': ['perform_action', 'action_complete', 'round_complete']
   };
 
@@ -223,15 +223,18 @@ export default function InteractPage() {
           // Group data by rounds (use current_round from API)
           const roundNumber = update.current_round || update.round_number;
           if (roundNumber !== undefined) {
+            console.log(`📊 Adding to round ${roundNumber}:`, stepToProcess);
             setReasoningRounds(prev => {
               const newMap = new Map(prev);
               const roundData = newMap.get(roundNumber) || [];
               roundData.push(update);
               newMap.set(roundNumber, roundData);
+              console.log(`📊 Round ${roundNumber} now has ${roundData.length} updates`);
               return newMap;
             });
           } else {
             // Add to general reasoning data if no round number
+            console.log('📊 Adding to general reasoning data:', stepToProcess);
             setReasoningData(prev => [...prev.slice(-20), update]); // Keep last 20
           }
 
