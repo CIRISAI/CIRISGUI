@@ -58,37 +58,45 @@ export default function InteractPage() {
     console.log(`🎬 QUEUE: Starting animation queue processing with ${animationQueue.current.length} items`);
     currentlyAnimating.current = true;
 
-    while (animationQueue.current.length > 0) {
-      const nextStep = animationQueue.current.shift();
-      if (nextStep) {
-        const queueTime = new Date().toLocaleTimeString();
-        console.log(`🎬 QUEUE: Setting activeStep to '${nextStep}' at ${queueTime}`);
-        setActiveStep(nextStep);
+    // Process all items currently in queue (don't allow new items during processing)
+    const itemsToProcess = [...animationQueue.current];
+    animationQueue.current = []; // Clear queue to prevent interference
 
-        // Record the queued animation trigger time
-        setAnimationTriggers(prev => ({
-          ...prev,
-          [nextStep]: queueTime
-        }));
+    for (const nextStep of itemsToProcess) {
+      const queueTime = new Date().toLocaleTimeString();
+      console.log(`🎬 QUEUE: Setting activeStep to '${nextStep}' at ${queueTime}`);
+      setActiveStep(nextStep);
 
-        // Wait 800ms before next animation (ensures visibility)
-        await new Promise(resolve => setTimeout(resolve, 800));
-      }
+      // Record the queued animation trigger time
+      setAnimationTriggers(prev => ({
+        ...prev,
+        [nextStep]: queueTime
+      }));
+
+      // Wait 800ms before next animation (ensures visibility)
+      await new Promise(resolve => setTimeout(resolve, 800));
     }
 
     console.log(`🎬 QUEUE: Animation queue processing complete`);
-    currentlyAnimating.current = false;
 
     // Clear after final step (with delay)
     animationTimeoutRef.current = setTimeout(() => {
       console.log(`🎬 QUEUE: Clearing activeStep after sequence complete`);
       setActiveStep(null);
+      currentlyAnimating.current = false; // Reset flag after clearing
     }, 2000);
   }, []);
 
   // Add animation step to queue and start processing
   const queueAnimationStep = useCallback((step: string) => {
     const queueTime = new Date().toLocaleTimeString();
+
+    // BLOCK new events while animation is currently processing
+    if (currentlyAnimating.current) {
+      console.log(`🎬 QUEUE: BLOCKING '${step}' - animation already in progress at ${queueTime}`);
+      return;
+    }
+
     console.log(`🎬 QUEUE: Adding '${step}' to animation queue at ${queueTime}`);
 
     // Clear any existing timeout from previous sequences
