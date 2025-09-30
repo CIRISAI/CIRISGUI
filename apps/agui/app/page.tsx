@@ -171,12 +171,15 @@ export default function InteractPage() {
             thoughtCount: update.updated_thoughts?.length || 0,
             sequence: update.stream_sequence,
             updateType: update.update_type,
-            currentStep: update.current_step,
-            fullUpdate: update // Log the entire update to see structure
+            currentStep: update.current_step
           });
+
+          // Log the FULL update object to see structure
+          console.log('🔍 FULL UPDATE OBJECT:', JSON.stringify(update, null, 2));
 
           // Log the thoughts data structure
           if (update.updated_thoughts && Array.isArray(update.updated_thoughts)) {
+            console.log(`📝 Processing ${update.updated_thoughts.length} thoughts`);
             update.updated_thoughts.forEach((thought: any, index: number) => {
               console.log(`📝 Thought ${index}:`, {
                 thought_id: thought.thought_id,
@@ -184,15 +187,27 @@ export default function InteractPage() {
                 status: thought.status,
                 allFields: Object.keys(thought) // Show all available fields
               });
+              console.log(`📝 Thought ${index} FULL:`, JSON.stringify(thought, null, 2));
             });
+          } else {
+            console.log('❌ No updated_thoughts found in update');
           }
 
           // Process the step data for visualization
-          if (update.current_step) {
+          let stepToProcess = update.current_step;
+
+          // If no top-level current_step, try to get it from the first thought
+          if (!stepToProcess && update.updated_thoughts && update.updated_thoughts.length > 0) {
+            stepToProcess = update.updated_thoughts[0].current_step;
+            console.log(`🔄 Using step from thought: ${stepToProcess}`);
+          }
+
+          if (stepToProcess) {
+            console.log(`🎯 Processing step: ${stepToProcess}`);
             // Find which simple step this belongs to
             for (const [simpleStep, detailSteps] of Object.entries(simpleSteps)) {
-              if (detailSteps.includes(update.current_step)) {
-                console.log(`🎨 Setting active step: ${simpleStep} (from ${update.current_step})`);
+              if (detailSteps.includes(stepToProcess)) {
+                console.log(`🎨 Setting active step: ${simpleStep} (from ${stepToProcess})`);
                 setActiveStep(simpleStep);
                 setTimeout(() => {
                   console.log(`🎨 Clearing active step: ${simpleStep}`);
@@ -201,6 +216,9 @@ export default function InteractPage() {
                 break;
               }
             }
+          } else {
+            console.log('❌ No step found in update or thoughts');
+          }
 
             // Group data by rounds
             if (update.round_number !== undefined) {
