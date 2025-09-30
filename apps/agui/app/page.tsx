@@ -247,12 +247,30 @@ export default function InteractPage() {
                 taskMap.set(thoughtId, thoughtSteps);
               }
 
-              // Add step data
+              // Add step data - capture all the step information
               thoughtSteps.push({
                 step: currentStep,
                 processingTime: processingTime,
                 timestamp: thought.current_step_started_at || update.timestamp,
-                stepResult: thought.step_result,
+                stepResult: {
+                  step_point: currentStep,
+                  success: thought.success,
+                  timestamp: thought.timestamp || thought.current_step_started_at || update.timestamp,
+                  processing_time_ms: processingTime,
+                  context: thought.context,
+                  summary: thought.summary,
+                  action_result: thought.action_result,
+                  selected_action: thought.selected_action,
+                  action_parameters: thought.action_parameters,
+                  context_size: thought.context_size,
+                  thoughts_processed: thought.thoughts_processed,
+                  round_status: thought.round_status,
+                  conscience_passed: thought.conscience_passed,
+                  dma_results: thought.dma_results,
+                  selection_reasoning: thought.selection_reasoning,
+                  dispatch_context: thought.dispatch_context,
+                  ...thought.step_result // Include any additional step_result data
+                },
                 status: thought.status
               });
 
@@ -704,44 +722,130 @@ export default function InteractPage() {
                               </span>
                             </summary>
                             <div className="p-2 space-y-2">
-                              {steps.map((step, index) => (
-                                <div key={index} className="bg-white border rounded p-2">
-                                  <div className="flex justify-between items-start mb-1">
-                                    <span className="text-sm font-medium text-gray-900">
-                                      {step.stepName}
-                                    </span>
-                                    <div className="text-xs text-gray-500">
-                                      <span className="font-medium">{step.processingTime}ms</span>
-                                      <span className="ml-2 text-gray-400">
-                                        {new Date(step.timestamp).toLocaleTimeString()}
+                              {steps.map((step, index) => {
+                                const stepData = step.stepResult || {};
+                                const stepPoint = stepData.step_point || step.step || 'unknown_step';
+                                const success = stepData.success;
+                                const processingTime = stepData.processing_time_ms || step.processingTime || 0;
+                                const timestamp = stepData.timestamp || step.timestamp;
+
+                                // Status icon based on success
+                                const statusIcon = success === true ? '✅' : success === false ? '❌' : '🔄';
+                                const statusText = success === true ? 'Success' : success === false ? 'Failed' : 'Processing';
+                                const statusColor = success === true ? 'text-green-600' : success === false ? 'text-red-600' : 'text-blue-600';
+
+                                return (
+                                  <div key={index} className="bg-white border rounded p-2">
+                                    <div className="flex justify-between items-start mb-2">
+                                      <span className="text-sm font-medium text-gray-900">
+                                        {stepPoint.replace('_', ' ').toUpperCase()}
                                       </span>
+                                      <div className="flex items-center space-x-2 text-xs">
+                                        <span className="font-medium text-gray-600">{processingTime}ms</span>
+                                        <span className={`flex items-center space-x-1 ${statusColor}`}>
+                                          <span>{statusIcon}</span>
+                                          <span className="hidden sm:inline">{statusText}</span>
+                                        </span>
+                                        <span className="text-gray-400">
+                                          {timestamp ? new Date(timestamp).toLocaleTimeString() : ''}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="text-xs text-gray-600 mb-1">
-                                    Status: <span className="font-medium">{step.status}</span>
-                                  </div>
-                                  {step.stepResult && (
-                                    <details className="text-xs">
-                                      <summary className="cursor-pointer text-blue-600 hover:text-blue-800">
-                                        Step Data
+
+                                    {/* Format key data fields nicely */}
+                                    {stepData.summary && (
+                                      <div className="mb-2 p-2 bg-blue-50 rounded text-xs">
+                                        <div className="font-medium text-blue-800 mb-1">Summary</div>
+                                        <div className="text-blue-700 break-words">
+                                          {stepData.summary.length > 200
+                                            ? `${stepData.summary.substring(0, 200)}...`
+                                            : stepData.summary}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {stepData.context && (
+                                      <details className="text-xs mb-2">
+                                        <summary className="cursor-pointer text-green-600 hover:text-green-800 font-medium">
+                                          Context Data
+                                        </summary>
+                                        <div className="mt-1 p-2 bg-green-50 rounded text-green-700 break-words">
+                                          {typeof stepData.context === 'string'
+                                            ? stepData.context.substring(0, 500) + (stepData.context.length > 500 ? '...' : '')
+                                            : JSON.stringify(stepData.context, null, 2).substring(0, 500) + '...'}
+                                        </div>
+                                      </details>
+                                    )}
+
+                                    {stepData.action_result && (
+                                      <details className="text-xs mb-2">
+                                        <summary className="cursor-pointer text-purple-600 hover:text-purple-800 font-medium">
+                                          Action Result
+                                        </summary>
+                                        <div className="mt-1 p-2 bg-purple-50 rounded text-purple-700 break-words">
+                                          {stepData.action_result.length > 300
+                                            ? `${stepData.action_result.substring(0, 300)}...`
+                                            : stepData.action_result}
+                                        </div>
+                                      </details>
+                                    )}
+
+                                    {stepData.selected_action && (
+                                      <div className="mb-2 p-2 bg-yellow-50 rounded text-xs">
+                                        <div className="font-medium text-yellow-800 mb-1">Selected Action</div>
+                                        <div className="text-yellow-700">{stepData.selected_action}</div>
+                                      </div>
+                                    )}
+
+                                    {stepData.action_parameters && (
+                                      <details className="text-xs mb-2">
+                                        <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 font-medium">
+                                          Action Parameters
+                                        </summary>
+                                        <div className="mt-1 p-2 bg-indigo-50 rounded text-indigo-700 break-words text-xs">
+                                          {stepData.action_parameters}
+                                        </div>
+                                      </details>
+                                    )}
+
+                                    {/* Show other interesting fields if they exist */}
+                                    {(stepData.context_size || stepData.thoughts_processed || stepData.round_status) && (
+                                      <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                                        {stepData.context_size && (
+                                          <span className="bg-gray-100 px-2 py-1 rounded">
+                                            Context: {stepData.context_size} chars
+                                          </span>
+                                        )}
+                                        {stepData.thoughts_processed && (
+                                          <span className="bg-gray-100 px-2 py-1 rounded">
+                                            Thoughts: {stepData.thoughts_processed}
+                                          </span>
+                                        )}
+                                        {stepData.round_status && (
+                                          <span className="bg-gray-100 px-2 py-1 rounded">
+                                            Round: {stepData.round_status}
+                                          </span>
+                                        )}
+                                        {stepData.conscience_passed !== undefined && (
+                                          <span className={`px-2 py-1 rounded ${stepData.conscience_passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            Conscience: {stepData.conscience_passed ? 'Passed' : 'Failed'}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Full raw data as fallback */}
+                                    <details className="text-xs mt-2">
+                                      <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
+                                        Raw Step Data
                                       </summary>
                                       <pre className="mt-1 p-2 bg-gray-50 rounded overflow-x-auto text-xs whitespace-pre-wrap break-words">
-                                        {JSON.stringify(step.stepResult, null, 2)}
+                                        {JSON.stringify(stepData, null, 2)}
                                       </pre>
                                     </details>
-                                  )}
-                                  {step.transparencyData && (
-                                    <details className="text-xs mt-1">
-                                      <summary className="cursor-pointer text-purple-600 hover:text-purple-800">
-                                        Transparency Data
-                                      </summary>
-                                      <pre className="mt-1 p-2 bg-purple-50 rounded overflow-x-auto text-xs whitespace-pre-wrap break-words">
-                                        {JSON.stringify(step.transparencyData, null, 2)}
-                                      </pre>
-                                    </details>
-                                  )}
-                                </div>
-                              ))}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </details>
                         ))}
