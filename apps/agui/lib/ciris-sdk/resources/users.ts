@@ -17,6 +17,15 @@ export interface UserSummary {
   is_active: boolean;
 }
 
+export interface LinkedOAuthAccount {
+  provider: string;
+  external_id: string;
+  account_name?: string;
+  linked_at?: string;
+  is_primary: boolean;
+  metadata: Record<string, string>;
+}
+
 export interface UserDetail extends UserSummary {
   permissions: string[];
   oauth_external_id?: string;
@@ -28,6 +37,7 @@ export interface UserDetail extends UserSummary {
   oauth_picture?: string;
   permission_requested_at?: string;
   custom_permissions?: string[];
+  linked_oauth_accounts: LinkedOAuthAccount[];
 }
 
 export interface UserListParams {
@@ -62,6 +72,13 @@ export interface CreateUserRequest {
   username: string;
   password: string;
   api_role?: APIRole;
+}
+
+export interface LinkOAuthAccountRequest {
+  provider: string;
+  external_id: string;
+  account_name?: string;
+  metadata?: Record<string, string>;
 }
 
 export interface MintWARequest {
@@ -202,5 +219,21 @@ export class UsersResource extends BaseResource {
    */
   async grantPermissions(userId: string, data: PermissionGrantRequest): Promise<UserDetail> {
     return this.transport.put<UserDetail>(`/v1/users/${userId}/permissions`, data);
+  }
+
+  /**
+   * Link an OAuth account to an existing user
+   * Requires: users.write permission
+   */
+  async linkOAuthAccount(userId: string, data: LinkOAuthAccountRequest): Promise<UserDetail> {
+    return this.transport.post<UserDetail>(`/v1/users/${userId}/oauth-links`, data);
+  }
+
+  /**
+   * Unlink an OAuth account from a user
+   * Requires: users.write permission
+   */
+  async unlinkOAuthAccount(userId: string, provider: string, externalId: string): Promise<UserDetail> {
+    return this.transport.delete<UserDetail>(`/v1/users/${userId}/oauth-links/${provider}/${externalId}`);
   }
 }

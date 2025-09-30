@@ -33,6 +33,9 @@ export default function InteractPage() {
   const [reasoningData, setReasoningData] = useState<any[]>([]);
   const [activeStep, setActiveStep] = useState<string | null>(null);
   const [reasoningRounds, setReasoningRounds] = useState<Map<number, any[]>>(new Map());
+  const [streamConnected, setStreamConnected] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Simple step mapping for 4-step visualization
   const simpleSteps = {
@@ -53,14 +56,24 @@ export default function InteractPage() {
 
   // Connect to reasoning stream for simple visualization
   useEffect(() => {
-    if (!currentAgent) return;
-
     const token = cirisClient.auth.getAccessToken();
-    if (!token) return;
+    if (!token) {
+      setStreamError('Authentication required for streaming');
+      return;
+    }
 
+    // Use SDK's configured base URL to ensure proper routing
     const apiBaseUrl = cirisClient.getBaseURL();
     const streamUrl = `${apiBaseUrl}/v1/system/runtime/reasoning-stream`;
 
+    console.log('🔌 Connecting to reasoning stream:', streamUrl);
+    console.log('Token being used:', token.substring(0, 20) + '...');
+
+    // Create abort controller for cleanup
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Use fetch with proper headers instead of EventSource
     const connectStream = async () => {
       try {
         const response = await fetch(streamUrl, {
@@ -68,68 +81,161 @@ export default function InteractPage() {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'text/event-stream',
-            'Cache-Control': 'no-cache',
           },
+          signal: abortController.signal,
         });
 
         if (!response.ok) {
-          throw new Error(`Stream failed: ${response.status}`);
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+
+        console.log('✅ Stream response received');
+        setStreamConnected(true);
+        setStreamError(null);
 
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
+        let buffer = '';
 
-        while (reader) {
+        if (!reader) {
+          throw new Error('Response body is not readable');
+        }
+
+        // Process the stream
+        let eventType = '';
+        let eventData = '';
+
+        while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+          if (done) {
+            console.log('Stream ended');
+            // Process any remaining buffered event
+            if (eventType && eventData) {
+              processSSEEvent(eventType, eventData);
+            }
+            break;
+          }
+
+          // Decode and buffer
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete SSE events
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-
-                // Update simple step visualization
-                if (data.step_point) {
-                  // Find which simple step this belongs to
-                  for (const [simpleStep, detailSteps] of Object.entries(simpleSteps)) {
-                    if (detailSteps.includes(data.step_point)) {
-                      setActiveStep(simpleStep);
-                      setTimeout(() => setActiveStep(null), 2000); // Clear after 2 seconds (8s total cycle)
-                      break;
-                    }
-                  }
-
-                  // Group data by rounds
-                  if (data.round_number !== undefined) {
-                    setReasoningRounds(prev => {
-                      const newMap = new Map(prev);
-                      const roundData = newMap.get(data.round_number) || [];
-                      roundData.push(data);
-                      newMap.set(data.round_number, roundData);
-                      return newMap;
-                    });
-                  } else {
-                    // Add to general reasoning data if no round number
-                    setReasoningData(prev => [...prev.slice(-20), data]); // Keep last 20
-                  }
-                }
-              } catch (e) {
-                // Ignore parsing errors
+            if (line.startsWith('event:')) {
+              // If we have a pending event, process it first
+              if (eventType && eventData) {
+                processSSEEvent(eventType, eventData);
+              }
+              eventType = line.slice(6).trim();
+              eventData = '';
+            } else if (line.startsWith('data:')) {
+              // SSE can have multi-line data, append if we already have some
+              const newData = line.slice(5).trim();
+              eventData = eventData ? eventData + '\n' + newData : newData;
+            } else if (line === '') {
+              // Empty line signals end of event
+              if (eventType && eventData) {
+                processSSEEvent(eventType, eventData);
+                eventType = '';
+                eventData = '';
               }
             }
+            // Ignore other lines (comments, etc.)
           }
         }
-      } catch (error) {
-        console.error('Reasoning stream error:', error);
-        // Retry after 5 seconds
-        setTimeout(connectStream, 5000);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error('❌ Stream connection error:', error);
+          setStreamError(`Connection failed: ${error.message}`);
+          setStreamConnected(false);
+        }
       }
     };
 
+    // Function to process SSE events
+    const processSSEEvent = (eventType: string, eventData: string) => {
+      console.log(`🎯 SSE Event received - Type: ${eventType}, Data length: ${eventData.length}`);
+
+      try {
+        if (eventType === 'connected') {
+          console.log('✅ Stream connected:', eventData);
+          setStreamConnected(true);
+          setStreamError(null);
+        } else if (eventType === 'step_update') {
+          const update = JSON.parse(eventData);
+          console.log('📊 Step update received:', {
+            thoughtCount: update.updated_thoughts?.length || 0,
+            sequence: update.stream_sequence,
+            updateType: update.update_type,
+            currentStep: update.current_step
+          });
+
+          // Process the step data for visualization
+          if (update.current_step) {
+            // Find which simple step this belongs to
+            for (const [simpleStep, detailSteps] of Object.entries(simpleSteps)) {
+              if (detailSteps.includes(update.current_step)) {
+                setActiveStep(simpleStep);
+                setTimeout(() => setActiveStep(null), 2000); // Clear after 2 seconds
+                break;
+              }
+            }
+
+            // Group data by rounds
+            if (update.round_number !== undefined) {
+              setReasoningRounds(prev => {
+                const newMap = new Map(prev);
+                const roundData = newMap.get(update.round_number) || [];
+                roundData.push(update);
+                newMap.set(update.round_number, roundData);
+                return newMap;
+              });
+            } else {
+              // Add to general reasoning data if no round number
+              setReasoningData(prev => [...prev.slice(-20), update]); // Keep last 20
+            }
+          }
+
+          // Also check thoughts for step updates
+          if (update.updated_thoughts && Array.isArray(update.updated_thoughts)) {
+            update.updated_thoughts.forEach((thought: any) => {
+              if (thought.current_step) {
+                // Find which simple step this belongs to
+                for (const [simpleStep, detailSteps] of Object.entries(simpleSteps)) {
+                  if (detailSteps.includes(thought.current_step)) {
+                    setActiveStep(simpleStep);
+                    setTimeout(() => setActiveStep(null), 2000);
+                    break;
+                  }
+                }
+              }
+            });
+          }
+
+        } else if (eventType === 'keepalive') {
+          console.log('💓 Keepalive:', eventData);
+        } else if (eventType === 'error') {
+          const errorData = JSON.parse(eventData);
+          console.error('❌ Stream error:', errorData);
+          setStreamError(`Stream error: ${errorData.message || 'Unknown error'}`);
+        }
+      } catch (error) {
+        console.error('Failed to process event:', eventType, error);
+      }
+    };
+
+    // Start the connection
     connectStream();
+
+    return () => {
+      console.log('🔌 Closing stream connection');
+      abortController.abort();
+      abortControllerRef.current = null;
+    };
   }, [currentAgent]);
 
   // Fetch conversation history - limit to 20 most recent
@@ -278,6 +384,10 @@ export default function InteractPage() {
                     <StatusDot status={!statusError && status ? 'green' : 'red'} className="mr-2" />
                     {!statusError && status ? 'Connected' : 'Disconnected'}
                   </span>
+                  <span className={`flex items-center ${streamConnected ? 'text-green-600' : 'text-red-600'}`}>
+                    <StatusDot status={streamConnected ? 'green' : 'red'} className="mr-2" />
+                    Stream: {streamConnected ? 'Connected' : 'Disconnected'}
+                  </span>
                   {status && (
                     <span className="text-gray-600">
                       State: <span className="font-medium">{status.cognitive_state}</span>
@@ -310,6 +420,13 @@ export default function InteractPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Stream Error Display */}
+              {streamError && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+                  <p className="text-sm text-red-800">Stream Error: {streamError}</p>
+                </div>
+              )}
 
               {/* Messages */}
               <div className="border rounded-lg bg-gray-50 h-96 overflow-y-auto p-4 mb-4">
