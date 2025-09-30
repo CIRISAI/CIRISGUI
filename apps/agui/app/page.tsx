@@ -171,16 +171,33 @@ export default function InteractPage() {
             thoughtCount: update.updated_thoughts?.length || 0,
             sequence: update.stream_sequence,
             updateType: update.update_type,
-            currentStep: update.current_step
+            currentStep: update.current_step,
+            fullUpdate: update // Log the entire update to see structure
           });
+
+          // Log the thoughts data structure
+          if (update.updated_thoughts && Array.isArray(update.updated_thoughts)) {
+            update.updated_thoughts.forEach((thought: any, index: number) => {
+              console.log(`📝 Thought ${index}:`, {
+                thought_id: thought.thought_id,
+                current_step: thought.current_step,
+                status: thought.status,
+                allFields: Object.keys(thought) // Show all available fields
+              });
+            });
+          }
 
           // Process the step data for visualization
           if (update.current_step) {
             // Find which simple step this belongs to
             for (const [simpleStep, detailSteps] of Object.entries(simpleSteps)) {
               if (detailSteps.includes(update.current_step)) {
+                console.log(`🎨 Setting active step: ${simpleStep} (from ${update.current_step})`);
                 setActiveStep(simpleStep);
-                setTimeout(() => setActiveStep(null), 2000); // Clear after 2 seconds
+                setTimeout(() => {
+                  console.log(`🎨 Clearing active step: ${simpleStep}`);
+                  setActiveStep(null);
+                }, 2000); // Clear after 2 seconds
                 break;
               }
             }
@@ -207,8 +224,12 @@ export default function InteractPage() {
                 // Find which simple step this belongs to
                 for (const [simpleStep, detailSteps] of Object.entries(simpleSteps)) {
                   if (detailSteps.includes(thought.current_step)) {
+                    console.log(`🎨 Setting active step from thought: ${simpleStep} (from thought step ${thought.current_step})`);
                     setActiveStep(simpleStep);
-                    setTimeout(() => setActiveStep(null), 2000);
+                    setTimeout(() => {
+                      console.log(`🎨 Clearing active step from thought: ${simpleStep}`);
+                      setActiveStep(null);
+                    }, 2000);
                     break;
                   }
                 }
@@ -608,13 +629,24 @@ export default function InteractPage() {
               </div>
 
               {/* Active step indicator */}
-              {activeStep && (
-                <div className="text-center mb-4">
+              <div className="text-center mb-4">
+                {activeStep ? (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
                     Currently: {activeStep.replace('_', ' ')}
                   </span>
+                ) : (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
+                    Waiting for reasoning steps...
+                  </span>
+                )}
+                {/* Debug info */}
+                <div className="text-xs text-gray-500 mt-2">
+                  Stream: {streamConnected ? 'Connected' : 'Disconnected'} |
+                  Rounds: {reasoningRounds.size} |
+                  Data: {reasoningData.length} |
+                  Active: {activeStep || 'none'}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )}
