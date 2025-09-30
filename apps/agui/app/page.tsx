@@ -37,11 +37,11 @@ export default function InteractPage() {
   const [streamError, setStreamError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Better step mapping for 4-step visualization (using lowercase to match API)
+  // Corrected step mapping for 4-step visualization (using lowercase to match API)
   const simpleSteps = {
     'DMAS': ['gather_context', 'perform_dmas'],
-    'ACTION_SELECTION': ['perform_aspdma', 'finalize_action'],
-    'CONSCIENCE': ['conscience_execution', 'recursive_aspdma', 'recursive_conscience'],
+    'ACTION_SELECTION': ['perform_aspdma'],
+    'CONSCIENCE': ['conscience_execution', 'recursive_aspdma', 'recursive_conscience', 'finalize_action'],
     'ACTION_COMPLETE': ['perform_action', 'action_complete', 'round_complete']
   };
 
