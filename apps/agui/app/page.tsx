@@ -124,7 +124,7 @@ export default function InteractPage() {
   const processCollectedEvents = useCallback(async () => {
     if (currentlyAnimating.current || eventCollection.current.length === 0) return;
 
-    console.log(`🎬 COLLECT: Processing ${eventCollection.current.length} collected events`);
+    // console.log(`🎬 COLLECT: Processing ${eventCollection.current.length} collected events`);
     currentlyAnimating.current = true;
 
     // Group events by thought to show parallel reasoning
@@ -148,13 +148,13 @@ export default function InteractPage() {
     eventsToProcess.forEach(event => uniqueSteps.add(event.step));
     const orderedSteps = stepOrder.filter(step => uniqueSteps.has(step));
 
-    console.log(`🎬 COLLECT: Animation sequence: [${orderedSteps.join(' → ')}]`);
-    console.log(`🎬 COLLECT: Thoughts involved: ${Array.from(thoughtGroups.keys()).join(', ')}`);
+    // console.log(`🎬 COLLECT: Animation sequence: [${orderedSteps.join(' → ')}]`);
+    // console.log(`🎬 COLLECT: Thoughts involved: ${Array.from(thoughtGroups.keys()).join(', ')}`);
 
     // Animate each step in sequence
     for (const step of orderedSteps) {
       const queueTime = new Date().toLocaleTimeString();
-      console.log(`🎬 COLLECT: Setting activeStep to '${step}' at ${queueTime}`);
+      // console.log(`🎬 COLLECT: Setting activeStep to '${step}' at ${queueTime}`);
       setActiveStep(step);
 
       // Record the animation trigger time
@@ -167,11 +167,11 @@ export default function InteractPage() {
       await new Promise(resolve => setTimeout(resolve, 800));
     }
 
-    console.log(`🎬 COLLECT: Animation sequence complete`);
+    // console.log(`🎬 COLLECT: Animation sequence complete`);
 
     // Clear after final step (with delay)
     animationTimeoutRef.current = setTimeout(() => {
-      console.log(`🎬 COLLECT: Clearing activeStep after sequence complete`);
+      // console.log(`🎬 COLLECT: Clearing activeStep after sequence complete`);
       setActiveStep(null);
       currentlyAnimating.current = false; // Reset flag after clearing
     }, 2000);
@@ -183,11 +183,11 @@ export default function InteractPage() {
 
     // BLOCK new events while animation is currently processing
     if (currentlyAnimating.current) {
-      console.log(`🎬 COLLECT: BLOCKING '${step}' - animation already in progress at ${collectTime}`);
+      // console.log(`🎬 COLLECT: BLOCKING '${step}' - animation already in progress at ${collectTime}`);
       return;
     }
 
-    console.log(`🎬 COLLECT: Adding '${step}' (thought: ${thoughtId || 'main'}) to collection at ${collectTime}`);
+    // console.log(`🎬 COLLECT: Adding '${step}' (thought: ${thoughtId || 'main'}) to collection at ${collectTime}`);
 
     // Add to collection (allow duplicates from different thoughts)
     eventCollection.current.push({
@@ -203,11 +203,11 @@ export default function InteractPage() {
 
     // Set new collection timeout (150ms to gather burst)
     collectionTimeoutRef.current = setTimeout(() => {
-      console.log(`🎬 COLLECT: Collection timeout reached, processing ${eventCollection.current.length} events`);
+      // console.log(`🎬 COLLECT: Collection timeout reached, processing ${eventCollection.current.length} events`);
       processCollectedEvents();
     }, 150);
 
-    console.log(`🎬 COLLECT: Collection now has ${eventCollection.current.length} events, waiting 150ms for more...`);
+    // console.log(`🎬 COLLECT: Collection now has ${eventCollection.current.length} events, waiting 150ms for more...`);
   }, [processCollectedEvents]);
 
   // Update task-thought flow visualization
@@ -266,42 +266,15 @@ export default function InteractPage() {
         }, 2000); // 2 second animation duration
       }
 
-      console.log(`🎨 FLOW: Updated task ${taskId}, thought ${thoughtId} → ${step}`);
-      console.log(`🎨 FLOW: Total active tasks: ${newTasks.size}, Task colors:`, Array.from(newTasks.values()).map(t => t.color));
+      // console.log(`🎨 FLOW: Updated task ${taskId}, thought ${thoughtId} → ${step}`);
+      // console.log(`🎨 FLOW: Total active tasks: ${newTasks.size}, Task colors:`, Array.from(newTasks.values()).map(t => t.color));
       return newTasks;
     });
   }, [taskColors]);
 
-  // Initialize with some test data to show the visualization when agent is loaded
-  useEffect(() => {
-    if (currentAgent && activeTasks.size === 0) {
-      console.log('🎨 INIT: Adding test task data to show visualization');
-      // Add a couple of test tasks to demonstrate the visualization
-      setTimeout(() => {
-        updateTaskThoughtFlow('test-thought-1', 'task-001', 'gather_context');
-        updateTaskThoughtFlow('test-thought-2', 'task-001', 'perform_dmas');
-        updateTaskThoughtFlow('test-thought-3', 'task-002', 'gather_context');
-      }, 1000);
-      setTimeout(() => {
-        updateTaskThoughtFlow('test-thought-1', 'task-001', 'perform_aspdma');
-        updateTaskThoughtFlow('test-thought-3', 'task-002', 'perform_aspdma');
-      }, 2000);
-      setTimeout(() => {
-        updateTaskThoughtFlow('test-thought-1', 'task-001', 'conscience_execution');
-        updateTaskThoughtFlow('test-thought-3', 'task-002', 'finalize_action');
-      }, 3000);
-      setTimeout(() => {
-        updateTaskThoughtFlow('test-thought-1', 'task-001', 'action_complete');
-        updateTaskThoughtFlow('test-thought-3', 'task-002', 'action_complete');
-      }, 4000);
-    }
-  }, [currentAgent, activeTasks.size, updateTaskThoughtFlow]);
-
   // Generate progress bars for a specific step - simplified approach
   const generateProgressBars = useCallback((stepName: string) => {
     const bars: React.ReactElement[] = [];
-
-    console.log(`🎨 PROGRESS: Generating bars for ${stepName}, activeTasks:`, activeTasks.size);
 
     // Simple approach: show one bar per task that has reached this step
     Array.from(activeTasks.entries()).forEach(([taskId, task]) => {
@@ -362,7 +335,6 @@ export default function InteractPage() {
       );
     }
 
-    console.log(`🎨 PROGRESS: Generated ${bars.length} bars for ${stepName}`);
     return bars.slice(0, 8); // Max 8 indicators
   }, [activeTasks]);
 
@@ -378,10 +350,10 @@ export default function InteractPage() {
   };
 
   // Track when activeStep state actually changes (React render timing)
-  useEffect(() => {
-    const renderTime = new Date().toLocaleTimeString();
-    console.log(`🕐 TIMING: React RENDER: activeStep changed to '${activeStep}' at ${renderTime}`);
-  }, [activeStep]);
+  // useEffect(() => {
+  //   const renderTime = new Date().toLocaleTimeString();
+  //   console.log(`🕐 TIMING: React RENDER: activeStep changed to '${activeStep}' at ${renderTime}`);
+  // }, [activeStep]);
 
   // Corrected step mapping for 4-step visualization (using lowercase to match API)
   const simpleSteps = {
@@ -517,38 +489,15 @@ export default function InteractPage() {
           const update = JSON.parse(eventData);
           const parseEndTime = new Date().toLocaleTimeString();
 
-          console.log(`🕐 TIMING: Step update parsing: Start ${parseStartTime} → End ${parseEndTime}`);
-          console.log('📊 Step update received:', {
-            thoughtCount: update.updated_thoughts?.length || 0,
-            sequence: update.stream_sequence,
-            updateType: update.update_type,
-            currentStep: update.current_step
-          });
-
-          // Log the FULL update object to see structure
-          console.log('🔍 FULL UPDATE OBJECT:', JSON.stringify(update, null, 2));
-
-          // Log the thoughts data structure
-          if (update.updated_thoughts && Array.isArray(update.updated_thoughts)) {
-            console.log(`📝 Processing ${update.updated_thoughts.length} thoughts`);
-            update.updated_thoughts.forEach((thought: any, index: number) => {
-              console.log(`📝 Thought ${index}:`, {
-                thought_id: thought.thought_id,
-                current_step: thought.current_step,
-                status: thought.status,
-                allFields: Object.keys(thought) // Show all available fields
-              });
-              console.log(`📝 Thought ${index} FULL:`, JSON.stringify(thought, null, 2));
-            });
-          } else {
-            console.log('❌ No updated_thoughts found in update');
-          }
+          // Minimal logging - only log errors
+          // console.log(`🕐 TIMING: Step update parsing: Start ${parseStartTime} → End ${parseEndTime}`);
+          // console.log('📊 Step update received:', update.updated_thoughts?.length || 0, 'thoughts');
 
           // Process the step data for visualization - handle multiple thoughts
           if (update.updated_thoughts && update.updated_thoughts.length > 0) {
             const animationStartTime = new Date().toLocaleTimeString();
-            console.log(`🕐 TIMING: Animation processing START: ${update.updated_thoughts.length} thoughts at ${animationStartTime}`);
-            console.log(`🕐 TIMING: Timeline: WebSocket(${wsReceiveTime}) → Parse(${parseStartTime}) → Animation(${animationStartTime})`);
+            // console.log(`🕐 TIMING: Animation processing START: ${update.updated_thoughts.length} thoughts at ${animationStartTime}`);
+            // console.log(`🕐 TIMING: Timeline: WebSocket(${wsReceiveTime}) → Parse(${parseStartTime}) → Animation(${animationStartTime})`);
 
             // Process each thought
             update.updated_thoughts.forEach((thought: any, thoughtIndex: number) => {
@@ -557,10 +506,10 @@ export default function InteractPage() {
               const taskId = thought.task_id;
 
               if (stepToProcess && thoughtId && taskId) {
-                console.log(`🕐 TIMING: Processing thought ${thoughtIndex}: ${stepToProcess} (ID: ${thoughtId}, Task: ${taskId})`);
+                // console.log(`🕐 TIMING: Processing thought ${thoughtIndex}: ${stepToProcess} (ID: ${thoughtId}, Task: ${taskId})`);
 
                 // Update task-thought flow visualization
-                console.log(`🎨 STREAM: Calling updateTaskThoughtFlow(${thoughtId}, ${taskId}, ${stepToProcess})`);
+                // console.log(`🎨 STREAM: Calling updateTaskThoughtFlow(${thoughtId}, ${taskId}, ${stepToProcess})`);
                 updateTaskThoughtFlow(thoughtId, taskId, stepToProcess);
 
                 // Determine which reasoning lane should be lit based on the step (supports old + new names)
@@ -589,14 +538,14 @@ export default function InteractPage() {
 
                 if (newActiveStep) {
                   const setStateTime = new Date().toLocaleTimeString();
-                  console.log(`🕐 TIMING: Collecting animation step: ${newActiveStep} (from ${stepToProcess}, thought: ${thoughtId}) at ${setStateTime}`);
+                  // console.log(`🕐 TIMING: Collecting animation step: ${newActiveStep} (from ${stepToProcess}, thought: ${thoughtId}) at ${setStateTime}`);
 
                   // Use collection system to group events before animation
                   collectAnimationEvent(newActiveStep, thoughtId);
 
-                  console.log(`🕐 TIMING: Animation processing COMPLETE: ${stepToProcess} → ${newActiveStep} at ${new Date().toLocaleTimeString()}`);
+                  // console.log(`🕐 TIMING: Animation processing COMPLETE: ${stepToProcess} → ${newActiveStep} at ${new Date().toLocaleTimeString()}`);
                 } else {
-                  console.log(`❓ No animation mapping for step: ${stepToProcess} at ${animationStartTime}`);
+                  // console.log(`❓ No animation mapping for step: ${stepToProcess} at ${animationStartTime}`);
                 }
               }
             });
@@ -612,7 +561,7 @@ export default function InteractPage() {
             const currentStep = thought.current_step;
             const processingTime = thought.step_result?.processing_time_ms || thought.processing_time_ms || 0;
 
-            console.log(`📊 Adding step to task ${taskId}, thought ${thoughtId}: ${currentStep} (${processingTime}ms)`);
+            // console.log(`📊 Adding step to task ${taskId}, thought ${thoughtId}: ${currentStep} (${processingTime}ms)`);
 
             setTaskData(prev => {
               const newMap = new Map(prev);

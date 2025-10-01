@@ -22,6 +22,15 @@ function Navbar({ className }: { className?: string }) {
   const router = useRouter();
   const [active, setActive] = useState<string | null>(null);
 
+  // Debug logging for role checking
+  React.useEffect(() => {
+    if (user) {
+      console.log('🔐 User role:', user.role);
+      console.log('🔐 Has ADMIN?', hasRole('ADMIN'));
+      console.log('🔐 Has SYSTEM_ADMIN?', hasRole('SYSTEM_ADMIN'));
+    }
+  }, [user, hasRole]);
+
   const navigation = [{ name: "Interact", href: "/", minRole: "OBSERVER" }];
   const systemNavigation = [
     { name: "API Explorer", href: "/api-demo", minRole: "OBSERVER" },
@@ -31,24 +40,36 @@ function Navbar({ className }: { className?: string }) {
     { name: "Audit", href: "/audit", minRole: "OBSERVER" },
     { name: "Logs", href: "/logs", minRole: "OBSERVER" },
     { name: "Tools", href: "/tools", minRole: "OBSERVER" },
-    { name: "System", href: "/system", minRole: "OBSERVER" },
-    { name: "Runtime Control", href: "/runtime", minRole: "OBSERVER" },
+  ];
+  const adminNavigation = [
+    { name: "System", href: "/system", minRole: "ADMIN" },
+    { name: "Runtime Control", href: "/runtime", minRole: "ADMIN" },
     { name: "Config", href: "/config", minRole: "ADMIN" },
-    { name: "Consent", href: "/consent", minRole: "OBSERVER" },
     { name: "Users", href: "/users", minRole: "ADMIN" },
-    { name: "WA", href: "/wa", minRole: "OBSERVER" },
+    { name: "WA", href: "/wa", minRole: "ADMIN" },
   ];
   const accountNavigation = [
-    { name: "Account", href: "/account", minRole: "OBSERVER" },
+    { name: "Account Settings", href: "/account", minRole: "OBSERVER" },
+    { name: "Consent Management", href: "/account/consent", minRole: "OBSERVER" },
+    { name: "Privacy Settings", href: "/account/privacy", minRole: "OBSERVER" },
   ];
 
   const visibleNavigation = navigation.filter((item) => hasRole(item.minRole));
   const visibleSystemNavigation = systemNavigation.filter((item) =>
     hasRole(item.minRole)
   );
+  const visibleAdminNavigation = adminNavigation.filter((item) =>
+    hasRole(item.minRole)
+  );
   const visibleAccountNavigation = accountNavigation.filter((item) =>
     hasRole(item.minRole)
   );
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('🔐 visibleAdminNavigation.length:', visibleAdminNavigation.length);
+    console.log('🔐 visibleAdminNavigation:', visibleAdminNavigation);
+  }, [visibleAdminNavigation]);
   return (
     <div className={cn("fixed   inset-x-0 max-w-2xl mx-auto z-50", className)}>
       <Menu setActive={setActive}>
@@ -87,6 +108,20 @@ function Navbar({ className }: { className?: string }) {
             ))}
           </div>
         </MenuItem>
+        {hasRole("ADMIN") && visibleAdminNavigation.length > 0 && (
+          <MenuItem setActive={setActive} active={active} item="Admin">
+            <div className="flex flex-col space-y-4 text-sm">
+              {visibleAdminNavigation.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  {item.name}
+                </Link>
+              ))}
+            </div>
+          </MenuItem>
+        )}
         {user && (
           <div className="flex items-center space-x-4">
             {hasRole("SYSTEM_ADMIN") && (
