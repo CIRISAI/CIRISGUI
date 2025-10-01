@@ -33,12 +33,8 @@ function Navbar({ className }: { className?: string }) {
 
   const navigation = [{ name: "Interact", href: "/", minRole: "OBSERVER" }];
   const systemNavigation = [
-    { name: "API Explorer", href: "/api-demo", minRole: "OBSERVER" },
-    { name: "API Docs", href: "/docs", minRole: "OBSERVER" },
-    { name: "Dashboard", href: "/dashboard", minRole: "OBSERVER" },
-    { name: "Memory", href: "/memory", minRole: "OBSERVER" },
-    { name: "Audit", href: "/audit", minRole: "OBSERVER" },
-    { name: "Logs", href: "/logs", minRole: "OBSERVER" },
+    { name: "Memory Graph", href: "/memory", minRole: "OBSERVER" },
+    { name: "System Details", href: "/dashboard", minRole: "OBSERVER" },
     { name: "Tools", href: "/tools", minRole: "OBSERVER" },
   ];
   const adminNavigation = [
@@ -47,6 +43,10 @@ function Navbar({ className }: { className?: string }) {
     { name: "Config", href: "/config", minRole: "ADMIN" },
     { name: "Users", href: "/users", minRole: "ADMIN" },
     { name: "WA", href: "/wa", minRole: "ADMIN" },
+    { name: "API Explorer", href: "/api-demo", minRole: "ADMIN" },
+    { name: "API Docs", href: "/docs", minRole: "ADMIN" },
+    { name: "Audit", href: "/audit", minRole: "ADMIN" },
+    { name: "Logs", href: "/logs", minRole: "ADMIN" },
   ];
   const accountNavigation = [
     { name: "Account Settings", href: "/account", minRole: "OBSERVER" },
