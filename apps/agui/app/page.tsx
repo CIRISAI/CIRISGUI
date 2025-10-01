@@ -39,10 +39,11 @@ export default function InteractPage() {
 
   // Animation trigger timestamps for debugging
   const [animationTriggers, setAnimationTriggers] = useState<{
-    DMAS?: string;
-    ACTION_SELECTION?: string;
-    CONSCIENCE?: string;
-    ACTION_COMPLETE?: string;
+    SNAPSHOT_AND_CONTEXT?: string;
+    DMA_RESULTS?: string;
+    ASPDMA_RESULT?: string;
+    CONSCIENCE_RESULT?: string;
+    ACTION_RESULT?: string;
   }>({});
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -73,8 +74,8 @@ export default function InteractPage() {
       thoughtGroups.get(thoughtId)!.push(event.step);
     });
 
-    // Create sequence: get unique steps in logical order
-    const stepOrder = ['DMAS', 'ACTION_SELECTION', 'CONSCIENCE', 'ACTION_COMPLETE'];
+    // Create sequence: get unique steps in logical H3ERE order
+    const stepOrder = ['SNAPSHOT_AND_CONTEXT', 'DMA_RESULTS', 'ASPDMA_RESULT', 'CONSCIENCE_RESULT', 'ACTION_RESULT'];
     const uniqueSteps = new Set<string>();
 
     eventsToProcess.forEach(event => uniqueSteps.add(event.step));
@@ -323,19 +324,28 @@ export default function InteractPage() {
               if (stepToProcess) {
                 console.log(`🕐 TIMING: Processing thought ${thoughtIndex}: ${stepToProcess} (ID: ${thoughtId})`);
 
-                // Determine which SVG circle should be lit based on the step
+                // Determine which reasoning lane should be lit based on the step (supports old + new names)
                 let newActiveStep: string | null = null;
 
-                if (['start_round', 'gather_context'].includes(stepToProcess)) {
-                  newActiveStep = 'DMAS';
-                } else if (['perform_dmas'].includes(stepToProcess)) {
-                  newActiveStep = 'DMAS'; // Stay on DMAS until ASPDMA starts
-                } else if (['perform_aspdma', 'recursive_aspdma'].includes(stepToProcess)) {
-                  newActiveStep = 'ACTION_SELECTION';
-                } else if (['conscience_execution', 'recursive_conscience'].includes(stepToProcess)) {
-                  newActiveStep = 'CONSCIENCE';
-                } else if (['finalize_action', 'perform_action', 'action_complete', 'round_complete'].includes(stepToProcess)) {
-                  newActiveStep = 'ACTION_COMPLETE';
+                // Lane 1: SNAPSHOT_AND_CONTEXT (Gather + Context)
+                if (['start_round', 'gather_context', 'perform_dmas', 'snapshot_and_context'].includes(stepToProcess)) {
+                  newActiveStep = 'SNAPSHOT_AND_CONTEXT';
+
+                // Lane 2: DMA_RESULTS (Analyze situation)
+                } else if (['perform_aspdma', 'recursive_aspdma', 'dma_results'].includes(stepToProcess)) {
+                  newActiveStep = 'DMA_RESULTS';
+
+                // Lane 3: ASPDMA_RESULT (Action selection)
+                } else if (['conscience_execution', 'recursive_conscience', 'aspdma_result'].includes(stepToProcess)) {
+                  newActiveStep = 'ASPDMA_RESULT';
+
+                // Lane 4: CONSCIENCE_RESULT (Ethical check)
+                } else if (['finalize_action', 'conscience_result'].includes(stepToProcess)) {
+                  newActiveStep = 'CONSCIENCE_RESULT';
+
+                // Lane 5: ACTION_RESULT (Execute action)
+                } else if (['perform_action', 'action_complete', 'round_complete', 'action_result'].includes(stepToProcess)) {
+                  newActiveStep = 'ACTION_RESULT';
                 }
 
                 if (newActiveStep) {
@@ -711,135 +721,150 @@ export default function InteractPage() {
             <div className="px-4 py-5 sm:p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">CIRIS Reasoning Process</h3>
 
-              {/* Simple Circular SVG */}
-              <div className="flex justify-center mb-6">
-                <svg width="300" height="300" viewBox="0 0 300 300" className="text-gray-600">
-                  {/* Background circle */}
-                  <circle cx="150" cy="150" r="120" fill="none" stroke="#e5e7eb" strokeWidth="2" />
+              {/* Reasoning Lanes - Interactive H3ERE Flow */}
+              <div className="mb-6">
+                <div className="space-y-3">
+                  {/* Lane 1: SNAPSHOT_AND_CONTEXT */}
+                  <div className={`flex items-center p-4 rounded-lg border-2 transition-all duration-300 ${
+                    activeStep === 'SNAPSHOT_AND_CONTEXT'
+                      ? 'border-blue-500 bg-blue-50 shadow-lg'
+                      : 'border-gray-200 bg-gray-50'
+                  }`}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${
+                      activeStep === 'SNAPSHOT_AND_CONTEXT'
+                        ? 'bg-blue-500 text-white animate-pulse'
+                        : 'bg-gray-300 text-gray-600'
+                    }`}>
+                      📸
+                    </div>
+                    <div className="ml-4 flex-1">
+                      <h4 className="font-medium text-gray-900">SNAPSHOT & CONTEXT</h4>
+                      <p className="text-sm text-gray-600">Gather system state and context</p>
+                    </div>
+                    <div className="flex space-x-1">
+                      {/* Thought activity indicators */}
+                      <div className={`w-3 h-3 rounded-full ${
+                        activeStep === 'SNAPSHOT_AND_CONTEXT' ? 'bg-blue-400' : 'bg-gray-300'
+                      }`}></div>
+                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                    </div>
+                  </div>
 
-                  {/* DMAS - Top (12 o'clock) */}
-                  <g id="dmas-group">
-                    <circle
-                      cx="150"
-                      cy="30"
-                      r="25"
-                      fill={activeStep === 'DMAS' ? '#ef4444' : '#f3f4f6'}
-                      stroke={activeStep === 'DMAS' ? '#dc2626' : '#9ca3af'}
-                      strokeWidth="3"
-                      className={activeStep === 'DMAS' ? 'animate-pulse' : ''}
-                    />
-                    <text x="150" y="37" textAnchor="middle" className="text-sm font-medium fill-current">
-                      DMAS
-                    </text>
-                    <text x="150" y="10" textAnchor="middle" className="text-xs fill-gray-500">
-                      Memory & Context
-                    </text>
-                  </g>
+                  {/* Lane 2: DMA_RESULTS */}
+                  <div className={`flex items-center p-4 rounded-lg border-2 transition-all duration-300 ${
+                    activeStep === 'DMA_RESULTS'
+                      ? 'border-purple-500 bg-purple-50 shadow-lg'
+                      : 'border-gray-200 bg-gray-50'
+                  }`}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${
+                      activeStep === 'DMA_RESULTS'
+                        ? 'bg-purple-500 text-white animate-pulse'
+                        : 'bg-gray-300 text-gray-600'
+                    }`}>
+                      🧠
+                    </div>
+                    <div className="ml-4 flex-1">
+                      <h4 className="font-medium text-gray-900">DMA ANALYSIS</h4>
+                      <p className="text-sm text-gray-600">Analyze situation with CSDMA, DSDMA, ASPDMA</p>
+                    </div>
+                    <div className="flex space-x-1">
+                      <div className={`w-3 h-3 rounded-full ${
+                        activeStep === 'DMA_RESULTS' ? 'bg-purple-400' : 'bg-gray-300'
+                      }`}></div>
+                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                    </div>
+                  </div>
 
-                  {/* ACTION SELECTION - Right (3 o'clock) */}
-                  <g id="action-selection-group">
-                    <circle
-                      cx="270"
-                      cy="150"
-                      r="25"
-                      fill={activeStep === 'ACTION_SELECTION' ? '#ef4444' : '#f3f4f6'}
-                      stroke={activeStep === 'ACTION_SELECTION' ? '#dc2626' : '#9ca3af'}
-                      strokeWidth="3"
-                      className={activeStep === 'ACTION_SELECTION' ? 'animate-pulse' : ''}
-                    />
-                    <text x="270" y="157" textAnchor="middle" className="text-sm font-medium fill-current">
-                      ACTION
-                    </text>
-                    <text x="270" y="147" textAnchor="middle" className="text-sm font-medium fill-current">
-                      SELECT
-                    </text>
-                    <text x="270" y="190" textAnchor="middle" className="text-xs fill-gray-500">
-                      Choose Response
-                    </text>
-                  </g>
+                  {/* Lane 3: ASPDMA_RESULT */}
+                  <div className={`flex items-center p-4 rounded-lg border-2 transition-all duration-300 ${
+                    activeStep === 'ASPDMA_RESULT'
+                      ? 'border-orange-500 bg-orange-50 shadow-lg'
+                      : 'border-gray-200 bg-gray-50'
+                  }`}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${
+                      activeStep === 'ASPDMA_RESULT'
+                        ? 'bg-orange-500 text-white animate-pulse'
+                        : 'bg-gray-300 text-gray-600'
+                    }`}>
+                      🎯
+                    </div>
+                    <div className="ml-4 flex-1">
+                      <h4 className="font-medium text-gray-900">ACTION SELECTION</h4>
+                      <p className="text-sm text-gray-600">Choose optimal action with rationale</p>
+                    </div>
+                    <div className="flex space-x-1">
+                      <div className={`w-3 h-3 rounded-full ${
+                        activeStep === 'ASPDMA_RESULT' ? 'bg-orange-400' : 'bg-gray-300'
+                      }`}></div>
+                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                    </div>
+                  </div>
 
-                  {/* CONSCIENCE - Bottom (6 o'clock) */}
-                  <g id="conscience-group">
-                    <circle
-                      cx="150"
-                      cy="270"
-                      r="25"
-                      fill={activeStep === 'CONSCIENCE' ? '#ef4444' : '#f3f4f6'}
-                      stroke={activeStep === 'CONSCIENCE' ? '#dc2626' : '#9ca3af'}
-                      strokeWidth="3"
-                      className={activeStep === 'CONSCIENCE' ? 'animate-pulse' : ''}
-                    />
-                    <text x="150" y="277" textAnchor="middle" className="text-sm font-medium fill-current">
-                      CONSCIENCE
-                    </text>
-                    <text x="150" y="295" textAnchor="middle" className="text-xs fill-gray-500">
-                      Ethical Check
-                    </text>
-                  </g>
+                  {/* Lane 4: CONSCIENCE_RESULT */}
+                  <div className={`flex items-center p-4 rounded-lg border-2 transition-all duration-300 ${
+                    activeStep === 'CONSCIENCE_RESULT'
+                      ? 'border-green-500 bg-green-50 shadow-lg'
+                      : 'border-gray-200 bg-gray-50'
+                  }`}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${
+                      activeStep === 'CONSCIENCE_RESULT'
+                        ? 'bg-green-500 text-white animate-pulse'
+                        : 'bg-gray-300 text-gray-600'
+                    }`}>
+                      💭
+                    </div>
+                    <div className="ml-4 flex-1">
+                      <h4 className="font-medium text-gray-900">CONSCIENCE CHECK</h4>
+                      <p className="text-sm text-gray-600">Ethical evaluation and final decision</p>
+                    </div>
+                    <div className="flex space-x-1">
+                      <div className={`w-3 h-3 rounded-full ${
+                        activeStep === 'CONSCIENCE_RESULT' ? 'bg-green-400' : 'bg-gray-300'
+                      }`}></div>
+                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                    </div>
+                    {/* Conscience Result Indicator */}
+                    {conscienceResult && activeStep === 'CONSCIENCE_RESULT' && (
+                      <div className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
+                        conscienceResult.passed
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {conscienceResult.passed ? '✅ APPROVED' : '⚠️ FLAGGED'}
+                      </div>
+                    )}
+                  </div>
 
-                  {/* ACTION COMPLETE - Left (9 o'clock) */}
-                  <g id="action-complete-group">
-                    <circle
-                      cx="30"
-                      cy="150"
-                      r="25"
-                      fill={activeStep === 'ACTION_COMPLETE' ? '#ef4444' : '#f3f4f6'}
-                      stroke={activeStep === 'ACTION_COMPLETE' ? '#dc2626' : '#9ca3af'}
-                      strokeWidth="3"
-                      className={activeStep === 'ACTION_COMPLETE' ? 'animate-pulse' : ''}
-                    />
-                    <text x="30" y="157" textAnchor="middle" className="text-sm font-medium fill-current">
-                      PERFORM
-                    </text>
-                    <text x="30" y="147" textAnchor="middle" className="text-sm font-medium fill-current">
-                      ACTION
-                    </text>
-                    <text x="30" y="125" textAnchor="middle" className="text-xs fill-gray-500">
-                      Execute & Finish
-                    </text>
-                  </g>
-
-                  {/* Flow arrows */}
-                  <defs>
-                    <marker id="arrowhead" markerWidth="10" markerHeight="7"
-                            refX="10" refY="3.5" orient="auto">
-                      <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
-                    </marker>
-                  </defs>
-
-                  {/* DMAS -> ACTION SELECTION */}
-                  <path d="M 175 55 Q 220 80 245 125" fill="none" stroke="#6b7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
-
-                  {/* ACTION SELECTION -> CONSCIENCE */}
-                  <path d="M 245 175 Q 220 220 175 245" fill="none" stroke="#6b7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
-
-                  {/* CONSCIENCE -> ACTION COMPLETE */}
-                  <path d="M 125 245 Q 80 220 55 175" fill="none" stroke="#6b7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
-
-                  {/* ACTION COMPLETE -> DMAS (completing the circle) */}
-                  <path d="M 55 125 Q 80 80 125 55" fill="none" stroke="#6b7280" strokeWidth="2" markerEnd="url(#arrowhead)" />
-
-                  {/* Conscience Result Indicator - Center */}
-                  {conscienceResult && (
-                    <g id="conscience-result">
-                      <circle
-                        cx="150"
-                        cy="150"
-                        r="18"
-                        fill={conscienceResult.passed ? '#10b981' : '#f59e0b'}
-                        stroke={conscienceResult.passed ? '#059669' : '#d97706'}
-                        strokeWidth="3"
-                        className="animate-pulse"
-                      />
-                      <text x="150" y="157" textAnchor="middle" className="text-lg font-bold fill-white">
-                        {conscienceResult.passed ? '✓' : '!'}
-                      </text>
-                      <text x="150" y="185" textAnchor="middle" className="text-xs fill-gray-600">
-                        Conscience: {conscienceResult.passed ? 'PASSED' : 'ALERT'}
-                      </text>
-                    </g>
-                  )}
-                </svg>
+                  {/* Lane 5: ACTION_RESULT */}
+                  <div className={`flex items-center p-4 rounded-lg border-2 transition-all duration-300 ${
+                    activeStep === 'ACTION_RESULT'
+                      ? 'border-red-500 bg-red-50 shadow-lg'
+                      : 'border-gray-200 bg-gray-50'
+                  }`}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${
+                      activeStep === 'ACTION_RESULT'
+                        ? 'bg-red-500 text-white animate-pulse'
+                        : 'bg-gray-300 text-gray-600'
+                    }`}>
+                      ⚡
+                    </div>
+                    <div className="ml-4 flex-1">
+                      <h4 className="font-medium text-gray-900">ACTION EXECUTION</h4>
+                      <p className="text-sm text-gray-600">Perform action and generate audit trail</p>
+                    </div>
+                    <div className="flex space-x-1">
+                      <div className={`w-3 h-3 rounded-full ${
+                        activeStep === 'ACTION_RESULT' ? 'bg-red-400' : 'bg-gray-300'
+                      }`}></div>
+                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Active step indicator */}
