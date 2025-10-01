@@ -16,6 +16,51 @@ import { ErrorModal } from '../components/ErrorModal';
 export default function InteractPage() {
   const { user } = useAuth();
   const { currentAgent, isLoadingAgents } = useAgent();
+
+  // CSS for task completion animation
+  React.useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes flowToBottom {
+        0% {
+          transform: translateY(0) scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: translateY(200px) scale(1.2);
+          opacity: 0.8;
+        }
+        100% {
+          transform: translateY(400px) scale(0.8);
+          opacity: 0.3;
+        }
+      }
+
+      .task-completing {
+        animation: flowToBottom 2s ease-in-out forwards;
+      }
+
+      @keyframes fadeIn {
+        0% {
+          opacity: 0;
+          transform: scale(0.8);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .animate-fade-in {
+        animation: fadeIn 0.5s ease-out forwards;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
   const [message, setMessage] = useState('');
   const [showShutdownDialog, setShowShutdownDialog] = useState(false);
   const [showEmergencyShutdownDialog, setShowEmergencyShutdownDialog] = useState(false);
@@ -45,6 +90,28 @@ export default function InteractPage() {
     CONSCIENCE_RESULT?: string;
     ACTION_RESULT?: string;
   }>({});
+
+  // Task-thought flow visualization state
+  const [activeTasks, setActiveTasks] = useState<Map<string, {
+    color: string;
+    thoughts: Map<string, { currentStep: string; completed: boolean }>;
+    completed: boolean;
+  }>>(new Map());
+
+  // Animation state for completed tasks flowing to results
+  const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
+  const [recentlyCompletedTasks, setRecentlyCompletedTasks] = useState<Array<{
+    taskId: string;
+    color: string;
+    completedAt: Date;
+  }>>([]);
+
+  // Task color palette
+  const taskColors = [
+    'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500',
+    'bg-red-500', 'bg-pink-500', 'bg-indigo-500', 'bg-yellow-500'
+  ];
+  const taskColorIndex = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Animation collection and queue system
@@ -142,6 +209,173 @@ export default function InteractPage() {
 
     console.log(`🎬 COLLECT: Collection now has ${eventCollection.current.length} events, waiting 150ms for more...`);
   }, [processCollectedEvents]);
+
+  // Update task-thought flow visualization
+  const updateTaskThoughtFlow = useCallback((thoughtId: string, taskId: string, step: string) => {
+    setActiveTasks(prev => {
+      const newTasks = new Map(prev);
+
+      // Get or create task
+      let task = newTasks.get(taskId);
+      if (!task) {
+        // Assign new color to new task
+        const color = taskColors[taskColorIndex.current % taskColors.length];
+        taskColorIndex.current++;
+
+        task = {
+          color,
+          thoughts: new Map(),
+          completed: false
+        };
+        newTasks.set(taskId, task);
+        console.log(`🎨 FLOW: New task ${taskId} assigned color ${color}`);
+      }
+
+      // Update thought progress
+      const isCompleted = ['action_complete', 'action_result'].includes(step.toLowerCase());
+      task.thoughts.set(thoughtId, {
+        currentStep: step,
+        completed: isCompleted
+      });
+
+      // Check if task is complete
+      if (isCompleted) {
+        task.completed = true;
+        console.log(`🎨 FLOW: Task ${taskId} marked as completed`);
+
+        // Trigger completion animation
+        setCompletingTasks(prev => new Set([...prev, taskId]));
+
+        // Add to recently completed tasks for display in results
+        setRecentlyCompletedTasks(prev => [
+          ...prev,
+          {
+            taskId,
+            color: task!.color, // Safe: task is guaranteed to exist here
+            completedAt: new Date()
+          }
+        ]);
+
+        // Remove from completing animation after delay
+        setTimeout(() => {
+          setCompletingTasks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(taskId);
+            return newSet;
+          });
+        }, 2000); // 2 second animation duration
+      }
+
+      console.log(`🎨 FLOW: Updated task ${taskId}, thought ${thoughtId} → ${step}`);
+      console.log(`🎨 FLOW: Total active tasks: ${newTasks.size}, Task colors:`, Array.from(newTasks.values()).map(t => t.color));
+      return newTasks;
+    });
+  }, [taskColors]);
+
+  // Initialize with some test data to show the visualization when agent is loaded
+  useEffect(() => {
+    if (currentAgent && activeTasks.size === 0) {
+      console.log('🎨 INIT: Adding test task data to show visualization');
+      // Add a couple of test tasks to demonstrate the visualization
+      setTimeout(() => {
+        updateTaskThoughtFlow('test-thought-1', 'task-001', 'gather_context');
+        updateTaskThoughtFlow('test-thought-2', 'task-001', 'perform_dmas');
+        updateTaskThoughtFlow('test-thought-3', 'task-002', 'gather_context');
+      }, 1000);
+      setTimeout(() => {
+        updateTaskThoughtFlow('test-thought-1', 'task-001', 'perform_aspdma');
+        updateTaskThoughtFlow('test-thought-3', 'task-002', 'perform_aspdma');
+      }, 2000);
+      setTimeout(() => {
+        updateTaskThoughtFlow('test-thought-1', 'task-001', 'conscience_execution');
+        updateTaskThoughtFlow('test-thought-3', 'task-002', 'finalize_action');
+      }, 3000);
+      setTimeout(() => {
+        updateTaskThoughtFlow('test-thought-1', 'task-001', 'action_complete');
+        updateTaskThoughtFlow('test-thought-3', 'task-002', 'action_complete');
+      }, 4000);
+    }
+  }, [currentAgent, activeTasks.size, updateTaskThoughtFlow]);
+
+  // Generate progress bars for a specific step - simplified approach
+  const generateProgressBars = useCallback((stepName: string) => {
+    const bars: React.ReactElement[] = [];
+
+    console.log(`🎨 PROGRESS: Generating bars for ${stepName}, activeTasks:`, activeTasks.size);
+
+    // Simple approach: show one bar per task that has reached this step
+    Array.from(activeTasks.entries()).forEach(([taskId, task]) => {
+      // Check if any thought in this task has reached this step
+      const hasReachedStep = Array.from(task.thoughts.values()).some(thought => {
+        const thoughtStep = thought.currentStep.toLowerCase();
+        const targetStep = stepName.toLowerCase();
+
+        // Simple mapping to check if thought has reached this step
+        if (targetStep.includes('snapshot') &&
+            (thoughtStep.includes('snapshot') || thoughtStep.includes('gather') || thoughtStep.includes('dmas'))) {
+          return true;
+        }
+        if (targetStep.includes('dma_results') &&
+            (thoughtStep.includes('aspdma') || thoughtStep.includes('dma_results'))) {
+          return true;
+        }
+        if (targetStep.includes('aspdma_result') &&
+            (thoughtStep.includes('conscience') || thoughtStep.includes('aspdma_result'))) {
+          return true;
+        }
+        if (targetStep.includes('conscience_result') &&
+            (thoughtStep.includes('finalize') || thoughtStep.includes('conscience_result'))) {
+          return true;
+        }
+        if (targetStep.includes('action_result') &&
+            (thoughtStep.includes('action') || thoughtStep.includes('complete'))) {
+          return true;
+        }
+        return false;
+      });
+
+      if (hasReachedStep) {
+        // Check if currently active at this step
+        const isCurrentlyActive = Array.from(task.thoughts.values()).some(thought =>
+          thought.currentStep.toLowerCase().includes(stepName.toLowerCase())
+        );
+
+        bars.push(
+          <div
+            key={`${taskId}-${stepName}`}
+            className={`w-4 h-4 rounded-full transition-all duration-300 ${task.color} ${
+              isCurrentlyActive ? 'animate-pulse ring-2 ring-white' : 'opacity-70'
+            }`}
+            title={`Task ${taskId.split('-').pop()?.substring(0, 6)} - ${stepName}`}
+          />
+        );
+      }
+    });
+
+    // Add empty indicators to show max capacity
+    while (bars.length < 4) {
+      bars.push(
+        <div
+          key={`empty-${bars.length}`}
+          className="w-4 h-4 rounded-full bg-gray-200"
+        />
+      );
+    }
+
+    console.log(`🎨 PROGRESS: Generated ${bars.length} bars for ${stepName}`);
+    return bars.slice(0, 8); // Max 8 indicators
+  }, [activeTasks]);
+
+  // Helper to get step index for ordering
+  const getStepIndex = (stepName: string): number => {
+    const stepLower = stepName.toLowerCase();
+    if (['start_round', 'gather_context', 'perform_dmas', 'snapshot_and_context'].some(s => stepLower.includes(s))) return 0;
+    if (['perform_aspdma', 'recursive_aspdma', 'dma_results'].some(s => stepLower.includes(s))) return 1;
+    if (['conscience_execution', 'recursive_conscience', 'aspdma_result'].some(s => stepLower.includes(s))) return 2;
+    if (['finalize_action', 'conscience_result'].some(s => stepLower.includes(s))) return 3;
+    if (['perform_action', 'action_complete', 'action_result'].some(s => stepLower.includes(s))) return 4;
+    return -1;
+  };
 
   // Track when activeStep state actually changes (React render timing)
   useEffect(() => {
@@ -320,9 +554,14 @@ export default function InteractPage() {
             update.updated_thoughts.forEach((thought: any, thoughtIndex: number) => {
               const stepToProcess = thought.current_step;
               const thoughtId = thought.thought_id;
+              const taskId = thought.task_id;
 
-              if (stepToProcess) {
-                console.log(`🕐 TIMING: Processing thought ${thoughtIndex}: ${stepToProcess} (ID: ${thoughtId})`);
+              if (stepToProcess && thoughtId && taskId) {
+                console.log(`🕐 TIMING: Processing thought ${thoughtIndex}: ${stepToProcess} (ID: ${thoughtId}, Task: ${taskId})`);
+
+                // Update task-thought flow visualization
+                console.log(`🎨 STREAM: Calling updateTaskThoughtFlow(${thoughtId}, ${taskId}, ${stepToProcess})`);
+                updateTaskThoughtFlow(thoughtId, taskId, stepToProcess);
 
                 // Determine which reasoning lane should be lit based on the step (supports old + new names)
                 let newActiveStep: string | null = null;
@@ -719,7 +958,50 @@ export default function InteractPage() {
         {currentAgent && (
           <div className="mt-6 bg-white shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">CIRIS Reasoning Process</h3>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center space-x-3">
+                  <h3 className="text-lg font-medium text-gray-900">CIRIS Reasoning Process</h3>
+                  {/* Clear Visual Indicator */}
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-full px-3 py-1">
+                    <div className="flex items-center space-x-1">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-medium text-green-800">Task Flow Active</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active Tasks Display - Top Right */}
+                {activeTasks.size > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-600">Active Tasks:</span>
+                    {Array.from(activeTasks.entries()).map(([taskId, task]) => {
+                      const isCompleting = completingTasks.has(taskId);
+                      return (
+                        <div
+                          key={taskId}
+                          className={`px-3 py-1 rounded text-xs font-medium text-white ${task.color} ${
+                            isCompleting
+                              ? 'task-completing'
+                              : task.completed
+                                ? 'opacity-50'
+                                : 'animate-pulse'
+                          }`}
+                          title={`Task ${taskId} - ${task.thoughts.size} thoughts${isCompleting ? ' (Completing!)' : ''}`}
+                        >
+                          {taskId.split('-').pop()?.substring(0, 6) || taskId.substring(0, 6)}
+                          {isCompleting && <span className="ml-1">→</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Debug Info */}
+              <div className="text-xs text-gray-500 mb-4">
+                Active Tasks Count: {activeTasks.size} |
+                Task Colors: {Array.from(activeTasks.values()).map(t => t.color).join(', ')}
+              </div>
 
               {/* Reasoning Lanes - Interactive H3ERE Flow */}
               <div className="mb-6">
@@ -742,12 +1024,8 @@ export default function InteractPage() {
                       <p className="text-sm text-gray-600">Gather system state and context</p>
                     </div>
                     <div className="flex space-x-1">
-                      {/* Thought activity indicators */}
-                      <div className={`w-3 h-3 rounded-full ${
-                        activeStep === 'SNAPSHOT_AND_CONTEXT' ? 'bg-blue-400' : 'bg-gray-300'
-                      }`}></div>
-                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
-                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                      {/* Task-thought progress indicators */}
+                      {generateProgressBars('SNAPSHOT_AND_CONTEXT')}
                     </div>
                   </div>
 
@@ -769,11 +1047,8 @@ export default function InteractPage() {
                       <p className="text-sm text-gray-600">Analyze situation with CSDMA, DSDMA, ASPDMA</p>
                     </div>
                     <div className="flex space-x-1">
-                      <div className={`w-3 h-3 rounded-full ${
-                        activeStep === 'DMA_RESULTS' ? 'bg-purple-400' : 'bg-gray-300'
-                      }`}></div>
-                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
-                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                      {/* Task-thought progress indicators */}
+                      {generateProgressBars('DMA_RESULTS')}
                     </div>
                   </div>
 
@@ -795,11 +1070,8 @@ export default function InteractPage() {
                       <p className="text-sm text-gray-600">Choose optimal action with rationale</p>
                     </div>
                     <div className="flex space-x-1">
-                      <div className={`w-3 h-3 rounded-full ${
-                        activeStep === 'ASPDMA_RESULT' ? 'bg-orange-400' : 'bg-gray-300'
-                      }`}></div>
-                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
-                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                      {/* Task-thought progress indicators */}
+                      {generateProgressBars('ASPDMA_RESULT')}
                     </div>
                   </div>
 
@@ -821,11 +1093,8 @@ export default function InteractPage() {
                       <p className="text-sm text-gray-600">Ethical evaluation and final decision</p>
                     </div>
                     <div className="flex space-x-1">
-                      <div className={`w-3 h-3 rounded-full ${
-                        activeStep === 'CONSCIENCE_RESULT' ? 'bg-green-400' : 'bg-gray-300'
-                      }`}></div>
-                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
-                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                      {/* Task-thought progress indicators */}
+                      {generateProgressBars('CONSCIENCE_RESULT')}
                     </div>
                     {/* Conscience Result Indicator */}
                     {conscienceResult && activeStep === 'CONSCIENCE_RESULT' && (
@@ -857,11 +1126,8 @@ export default function InteractPage() {
                       <p className="text-sm text-gray-600">Perform action and generate audit trail</p>
                     </div>
                     <div className="flex space-x-1">
-                      <div className={`w-3 h-3 rounded-full ${
-                        activeStep === 'ACTION_RESULT' ? 'bg-red-400' : 'bg-gray-300'
-                      }`}></div>
-                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
-                      <div className="w-3 h-3 rounded-full bg-gray-200"></div>
+                      {/* Task-thought progress indicators */}
+                      {generateProgressBars('ACTION_RESULT')}
                     </div>
                   </div>
                 </div>
@@ -903,6 +1169,38 @@ export default function InteractPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Recently Completed Tasks Banner */}
+        {recentlyCompletedTasks.length > 0 && (
+          <div className="mt-6 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 shadow rounded-lg">
+            <div className="px-4 py-3">
+              <div className="flex items-center">
+                <span className="text-lg mr-2">🎉</span>
+                <h3 className="text-md font-medium text-green-800 mr-4">
+                  Recently Completed Tasks:
+                </h3>
+                <div className="flex space-x-2 overflow-x-auto">
+                  {recentlyCompletedTasks.slice(-10).map((completedTask, index) => (
+                    <div
+                      key={`${completedTask.taskId}-${index}`}
+                      className={`px-2 py-1 rounded text-xs font-medium text-white ${completedTask.color} shrink-0 animate-fade-in`}
+                      title={`Task ${completedTask.taskId} completed at ${completedTask.completedAt.toLocaleTimeString()}`}
+                    >
+                      ✓ {completedTask.taskId.split('-').pop()?.substring(0, 6) || completedTask.taskId.substring(0, 6)}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setRecentlyCompletedTasks([])}
+                  className="ml-auto text-xs text-gray-500 hover:text-gray-700"
+                  title="Clear completed tasks"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           </div>
         )}

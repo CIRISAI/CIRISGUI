@@ -96,6 +96,28 @@ export default function RuntimeControlPage() {
   const [streamConnected, setStreamConnected] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Task-thought flow visualization state
+  const [activeTasks, setActiveTasks] = useState<Map<string, {
+    color: string;
+    thoughts: Map<string, { currentStep: string; completed: boolean }>;
+    completed: boolean;
+  }>>(new Map());
+
+  // Animation state for completed tasks flowing to results
+  const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
+  const [recentlyCompletedTasks, setRecentlyCompletedTasks] = useState<Array<{
+    taskId: string;
+    color: string;
+    completedAt: Date;
+  }>>([]);
+
+  // Task color palette
+  const taskColors = [
+    'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500',
+    'bg-red-500', 'bg-pink-500', 'bg-indigo-500', 'bg-yellow-500'
+  ];
+  const taskColorIndex = useRef(0);
   
   // Task and thought tracking state
   const [trackedTasks, setTrackedTasks] = useState<Map<string, TrackedTask>>(new Map());
@@ -412,6 +434,11 @@ export default function RuntimeControlPage() {
                   trackedThought.last_updated = update.timestamp || new Date().toISOString();
                   trackedThought.steps_completed = thought.steps_completed;
                   trackedThought.steps_remaining = thought.steps_remaining;
+
+                  // Update task-thought flow visualization
+                  if (thought.current_step) {
+                    updateTaskThoughtFlow(thoughtId, taskId, thought.current_step);
+                  }
                 
                   // If thought is completed, ensure all 9 core steps are marked as completed
                   if (thought.status === 'completed' || thought.status === 'complete') {
@@ -700,7 +727,138 @@ export default function RuntimeControlPage() {
     [H3EREStepPoint.RECURSIVE_ASPDMA]: '3-perform-aspdma', // Recursive - reuses step 3
     [H3EREStepPoint.RECURSIVE_CONSCIENCE]: '4-conscience', // Recursive - reuses step 4
   };
-  
+
+  // Update task-thought flow visualization
+  const updateTaskThoughtFlow = useCallback((thoughtId: string, taskId: string, step: string) => {
+    setActiveTasks(prev => {
+      const newTasks = new Map(prev);
+
+      // Get or create task
+      let task = newTasks.get(taskId);
+      if (!task) {
+        // Assign new color to new task
+        const color = taskColors[taskColorIndex.current % taskColors.length];
+        taskColorIndex.current++;
+
+        task = {
+          color,
+          thoughts: new Map(),
+          completed: false
+        };
+        newTasks.set(taskId, task);
+        console.log(`🎨 FLOW: New task ${taskId} assigned color ${color}`);
+      }
+
+      // Update thought progress
+      const isCompleted = ['action_complete', 'action_result'].includes(step.toLowerCase());
+      task.thoughts.set(thoughtId, {
+        currentStep: step,
+        completed: isCompleted
+      });
+
+      // Check if task is complete
+      if (isCompleted) {
+        task.completed = true;
+        console.log(`🎨 FLOW: Task ${taskId} marked as completed`);
+
+        // Trigger completion animation
+        setCompletingTasks(prev => new Set([...prev, taskId]));
+
+        // Add to recently completed tasks for display in results
+        setRecentlyCompletedTasks(prev => [
+          ...prev,
+          {
+            taskId,
+            color: task!.color, // Safe: task is guaranteed to exist here
+            completedAt: new Date()
+          }
+        ]);
+
+        // Remove from completing animation after delay
+        setTimeout(() => {
+          setCompletingTasks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(taskId);
+            return newSet;
+          });
+        }, 2000); // 2 second animation duration
+      }
+
+      console.log(`🎨 FLOW: Updated task ${taskId}, thought ${thoughtId} → ${step}`);
+      console.log(`🎨 FLOW: Total active tasks: ${newTasks.size}, Task colors:`, Array.from(newTasks.values()).map(t => t.color));
+      return newTasks;
+    });
+  }, [taskColors]);
+
+  // Generate progress bars for a specific step - simplified approach
+  const generateProgressBars = useCallback((stepName: string) => {
+    const bars: React.ReactElement[] = [];
+
+    console.log(`🎨 PROGRESS: Generating bars for ${stepName}, activeTasks:`, activeTasks.size);
+
+    // Simple approach: show one bar per task that has reached this step
+    Array.from(activeTasks.entries()).forEach(([taskId, task]) => {
+      // Check if any thought in this task has reached this step
+      const hasReachedStep = Array.from(task.thoughts.values()).some(thought => {
+        const thoughtStep = thought.currentStep.toLowerCase();
+        const targetStep = stepName.toLowerCase();
+
+        // Simple mapping to check if thought has reached this step
+        if (targetStep.includes('snapshot') &&
+            (thoughtStep.includes('snapshot') || thoughtStep.includes('gather') || thoughtStep.includes('dmas'))) {
+          return true;
+        }
+        if (targetStep.includes('dma_results') &&
+            (thoughtStep.includes('aspdma') || thoughtStep.includes('dma_results'))) {
+          return true;
+        }
+        if (targetStep.includes('aspdma_result') &&
+            (thoughtStep.includes('conscience') || thoughtStep.includes('aspdma_result'))) {
+          return true;
+        }
+        if (targetStep.includes('conscience_result') &&
+            (thoughtStep.includes('finalize') || thoughtStep.includes('conscience_result'))) {
+          return true;
+        }
+        if (targetStep.includes('action_result') &&
+            (thoughtStep.includes('action') || thoughtStep.includes('complete'))) {
+          return true;
+        }
+        return false;
+      });
+
+      if (hasReachedStep) {
+        // Check if currently active at this step
+        const isCurrentlyActive = Array.from(task.thoughts.values()).some(thought =>
+          thought.currentStep.toLowerCase().includes(stepName.toLowerCase())
+        );
+
+        bars.push(
+          <div
+            key={`${taskId}-${stepName}`}
+            className={`w-4 h-4 rounded-full transition-all duration-300 ${task.color} ${
+              isCurrentlyActive ? 'animate-pulse ring-2 ring-white' : 'opacity-70'
+            }`}
+            title={`Task ${taskId.split('-').pop()?.substring(0, 6)} - ${stepName}`}
+          />
+        );
+      }
+    });
+
+    // Add empty indicators to show max capacity
+    while (bars.length < 4) {
+      bars.push(
+        <div
+          key={`empty-${bars.length}`}
+          className="w-4 h-4 rounded-full bg-gray-200"
+        />
+      );
+    }
+
+    console.log(`🎨 PROGRESS: Generated ${bars.length} bars for ${stepName}`);
+    return bars.slice(0, 8); // Max 8 indicators
+  }, [activeTasks]);
+
   // Function to animate a step - simple and direct with spam prevention
   const animateStep = useCallback((step: H3EREStepPoint) => {
     const now = Date.now();
@@ -768,10 +926,27 @@ export default function RuntimeControlPage() {
       {/* Page Header */}
       <div className="bg-white shadow">
         <div className="px-4 py-5 sm:px-6">
-          <h2 className="text-2xl font-bold text-gray-900">Runtime Control</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Step-by-step debugging and visualization of CIRIS ethical reasoning pipeline
-          </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Runtime Control</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Step-by-step debugging and visualization of CIRIS ethical reasoning pipeline
+              </p>
+            </div>
+
+            {/* Clear Visual Indicator - Task Flow Active */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg px-4 py-2">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium text-blue-800">Task Flow Visualization Active</span>
+              </div>
+              <div className="text-xs text-blue-600 mt-1">
+                Active Tasks: {activeTasks.size} | Stream: {streamConnected ? '🟢' : '🔴'}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
