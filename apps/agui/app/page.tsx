@@ -211,7 +211,7 @@ export default function InteractPage() {
   }, [processCollectedEvents]);
 
   // Update task-thought flow visualization
-  const updateTaskThoughtFlow = useCallback((thoughtId: string, taskId: string, step: string) => {
+  const updateTaskThoughtFlow = useCallback((thoughtId: string, taskId: string, step: string, stepResult?: any) => {
     setActiveTasks(prev => {
       const newTasks = new Map(prev);
 
@@ -232,7 +232,10 @@ export default function InteractPage() {
       }
 
       // Update thought progress
-      const isCompleted = ['action_complete', 'action_result'].includes(step.toLowerCase());
+      // Check if task is actually completed by looking at action_executed field
+      const actionExecuted = stepResult?.action_executed;
+      const isCompleted = actionExecuted === 'task_complete' || actionExecuted === 'task_reject';
+
       task.thoughts.set(thoughtId, {
         currentStep: step,
         completed: isCompleted
@@ -514,7 +517,7 @@ export default function InteractPage() {
 
                 // Update task-thought flow visualization
                 // console.log(`🎨 STREAM: Calling updateTaskThoughtFlow(${thoughtId}, ${taskId}, ${stepToProcess})`);
-                updateTaskThoughtFlow(thoughtId, taskId, stepToProcess);
+                updateTaskThoughtFlow(thoughtId, taskId, stepToProcess, thought.step_result);
 
                 // Determine which reasoning lane should be lit based on the step (supports old + new names)
                 let newActiveStep: string | null = null;
