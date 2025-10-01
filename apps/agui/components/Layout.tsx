@@ -119,6 +119,14 @@ function Navbar({ className }: { className?: string }) {
                   {item.name}
                 </Link>
               ))}
+              <button
+                onClick={() => {
+                  logout();
+                  router.push('/login');
+                }}
+                className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium text-left">
+                Logout
+              </button>
             </div>
           </MenuItem>
         )}
@@ -147,43 +155,6 @@ export function Layout({ children }: LayoutProps) {
       <Navbar className="top-2 z-50" />
       <main className=" container pt-10 sm:px-6 lg:px-8">
         <div className=" pt-20 sm:px-6 lg:px-8">
-          {user && (
-            <div className="flex  items-start border border-gray-200 bg-gray-800 rounded-xl justify-between lg:shadow-lg p-6 mb-6">
-              <div className="flex items-center space-x-6">
-                <div>
-                  <p className="textmd text-gray-200">
-                    {user.username || user.user_id}
-                  </p>
-                  <p className="text-xs font-bold text-gray-100">({user.role})</p>
-                </div>
-                <div className="min-w-[250px]">
-                  <p className="text-xs text-gray-400 mb-1">Current Agent:</p>
-                  <div className="bg-white rounded-lg shadow-sm px-3 py-2">
-                    {currentAgent ? (
-                      <>
-                        <p className="text-sm font-medium text-gray-900">
-                          {currentAgent.agent_name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {agents.length > 1 ? 'To switch agents, please logout and login again' : 'Running'}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm font-medium text-gray-500">
-                          No agents available
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Please create an agent using the Manager
-                        </p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          )}
           {children}
         </div>
       </main>

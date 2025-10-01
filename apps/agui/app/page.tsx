@@ -789,10 +789,9 @@ export default function InteractPage() {
     <ProtectedRoute>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Interact with CIRIS</h1>
-          <p className="mt-2 text-lg text-gray-600">
-            Chat with your CIRIS agent in real-time
+        <div className="mb-6">
+          <p className="text-sm text-gray-600">
+            Ask {currentAgent?.agent_name || 'Datum'} a question about CIRIS or an ethical dilemma, and see the reasoning below. Note the agent may choose not to answer.
           </p>
         </div>
 
