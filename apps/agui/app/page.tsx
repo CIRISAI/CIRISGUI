@@ -94,6 +94,7 @@ export default function InteractPage() {
   // Task-thought flow visualization state
   const [activeTasks, setActiveTasks] = useState<Map<string, {
     color: string;
+    description: string; // Task description from THOUGHT_START
     thoughts: Map<string, {
       currentStep: string;
       completed: boolean;
@@ -146,7 +147,7 @@ export default function InteractPage() {
     });
 
     // Create sequence: get unique steps in logical H3ERE order
-    const stepOrder = ['SNAPSHOT_AND_CONTEXT', 'DMA_RESULTS', 'ASPDMA_RESULT', 'CONSCIENCE_RESULT', 'ACTION_RESULT'];
+    const stepOrder = ['THOUGHT_START', 'SNAPSHOT_AND_CONTEXT', 'DMA_RESULTS', 'ASPDMA_RESULT', 'CONSCIENCE_RESULT', 'ACTION_RESULT'];
     const uniqueSteps = new Set<string>();
 
     eventsToProcess.forEach(event => uniqueSteps.add(event.step));
@@ -215,7 +216,7 @@ export default function InteractPage() {
   }, [processCollectedEvents]);
 
   // Update task-thought flow visualization
-  const updateTaskThoughtFlow = useCallback((thoughtId: string, taskId: string, step: string, stepResult?: any) => {
+  const updateTaskThoughtFlow = useCallback((thoughtId: string, taskId: string, step: string, stepResult?: any, taskDescription?: string) => {
     setActiveTasks(prev => {
       const newTasks = new Map(prev);
 
@@ -228,11 +229,15 @@ export default function InteractPage() {
 
         task = {
           color,
+          description: taskDescription || '',
           thoughts: new Map(),
           completed: false
         };
         newTasks.set(taskId, task);
         console.log(`🎨 FLOW: New task ${taskId} assigned color ${color}`);
+      } else if (taskDescription && !task.description) {
+        // Update description if we didn't have one before
+        task.description = taskDescription;
       }
 
       // Update thought progress
@@ -502,6 +507,22 @@ export default function InteractPage() {
           console.log('✅ Stream connected:', eventData);
           setStreamConnected(true);
           setStreamError(null);
+        } else if (eventType === 'thought_start') {
+          // New THOUGHT_START event - contains thought + task metadata
+          const thoughtStart = JSON.parse(eventData);
+          console.log('🎬 THOUGHT_START received:', thoughtStart);
+
+          const thoughtId = thoughtStart.thought_id;
+          const taskId = thoughtStart.task_id;
+          const taskDescription = thoughtStart.task_description;
+
+          if (thoughtId && taskId) {
+            // Initialize task with description
+            updateTaskThoughtFlow(thoughtId, taskId, 'thought_start', null, taskDescription);
+
+            // Trigger THOUGHT_START animation
+            collectAnimationEvent('THOUGHT_START', thoughtId);
+          }
         } else if (eventType === 'step_update') {
           const parseStartTime = new Date().toLocaleTimeString();
           const update = JSON.parse(eventData);
@@ -945,9 +966,9 @@ export default function InteractPage() {
                                 ? 'opacity-50'
                                 : 'animate-pulse'
                           }`}
-                          title={`Task ${taskId} - ${task.thoughts.size} thoughts${isCompleting ? ' (Completing!)' : ''}`}
+                          title={task.description || `Task ${taskId} - ${task.thoughts.size} thoughts${isCompleting ? ' (Completing!)' : ''}`}
                         >
-                          {taskId.split('-').pop()?.substring(0, 6) || taskId.substring(0, 6)}
+                          {task.description || taskId.split('-').pop()?.substring(0, 6) || taskId.substring(0, 6)}
                           {isCompleting && <span className="ml-1">→</span>}
                         </div>
                       );
