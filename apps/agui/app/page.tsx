@@ -1183,14 +1183,69 @@ export default function InteractPage() {
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 {Array.from(taskData.entries())
                   .slice(-5) // Show last 5 tasks
-                  .map(([taskId, thoughts]) => (
-                    <details key={taskId} className="border border-gray-200 rounded-lg">
-                      <summary className="cursor-pointer p-3 bg-blue-50 hover:bg-blue-100 rounded-t-lg">
-                        <span className="font-medium text-blue-900">Task: {taskId}</span>
-                        <span className="ml-2 text-sm text-blue-600">
-                          ({thoughts.size} thoughts)
-                        </span>
-                      </summary>
+                  .map(([taskId, thoughts]) => {
+                    // Get task color from activeTasks
+                    const task = activeTasks.get(taskId);
+                    const taskColor = task?.color || 'bg-blue-500';
+
+                    // Map bg color to lighter version for background
+                    const bgColorMap: Record<string, string> = {
+                      'bg-blue-500': 'bg-blue-50',
+                      'bg-green-500': 'bg-green-50',
+                      'bg-purple-500': 'bg-purple-50',
+                      'bg-orange-500': 'bg-orange-50',
+                      'bg-red-500': 'bg-red-50',
+                      'bg-pink-500': 'bg-pink-50',
+                      'bg-indigo-500': 'bg-indigo-50',
+                      'bg-yellow-500': 'bg-yellow-50',
+                    };
+
+                    const hoverColorMap: Record<string, string> = {
+                      'bg-blue-500': 'hover:bg-blue-100',
+                      'bg-green-500': 'hover:bg-green-100',
+                      'bg-purple-500': 'hover:bg-purple-100',
+                      'bg-orange-500': 'hover:bg-orange-100',
+                      'bg-red-500': 'hover:bg-red-100',
+                      'bg-pink-500': 'hover:bg-pink-100',
+                      'bg-indigo-500': 'hover:bg-indigo-100',
+                      'bg-yellow-500': 'hover:bg-yellow-100',
+                    };
+
+                    const textColorMap: Record<string, string> = {
+                      'bg-blue-500': 'text-blue-900',
+                      'bg-green-500': 'text-green-900',
+                      'bg-purple-500': 'text-purple-900',
+                      'bg-orange-500': 'text-orange-900',
+                      'bg-red-500': 'text-red-900',
+                      'bg-pink-500': 'text-pink-900',
+                      'bg-indigo-500': 'text-indigo-900',
+                      'bg-yellow-500': 'text-yellow-900',
+                    };
+
+                    const subtextColorMap: Record<string, string> = {
+                      'bg-blue-500': 'text-blue-600',
+                      'bg-green-500': 'text-green-600',
+                      'bg-purple-500': 'text-purple-600',
+                      'bg-orange-500': 'text-orange-600',
+                      'bg-red-500': 'text-red-600',
+                      'bg-pink-500': 'text-pink-600',
+                      'bg-indigo-500': 'text-indigo-600',
+                      'bg-yellow-500': 'text-yellow-600',
+                    };
+
+                    const bgColor = bgColorMap[taskColor] || 'bg-blue-50';
+                    const hoverColor = hoverColorMap[taskColor] || 'hover:bg-blue-100';
+                    const textColor = textColorMap[taskColor] || 'text-blue-900';
+                    const subtextColor = subtextColorMap[taskColor] || 'text-blue-600';
+
+                    return (
+                      <details key={taskId} className="border border-gray-200 rounded-lg">
+                        <summary className={`cursor-pointer p-3 ${bgColor} ${hoverColor} rounded-t-lg`}>
+                          <span className={`font-medium ${textColor}`}>Task: {taskId}</span>
+                          <span className={`ml-2 text-sm ${subtextColor}`}>
+                            ({thoughts.size} thoughts)
+                          </span>
+                        </summary>
                       <div className="p-3 space-y-3">
                         {Array.from(thoughts.entries()).map(([thoughtId, steps]) => (
                           <details key={thoughtId} className="border border-gray-100 rounded-md">
@@ -1426,7 +1481,8 @@ export default function InteractPage() {
                         ))}
                       </div>
                     </details>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           </div>
