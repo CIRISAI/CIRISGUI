@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { cirisClient } from '../../lib/ciris-sdk';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgent } from '../../contexts/AgentContextHybrid';
@@ -10,7 +11,31 @@ import { StatusDot } from '../../components/Icons';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
-export default function AccountPage() {
+// Component to handle OAuth linking feedback
+function OAuthFeedbackHandler() {
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const linkedProvider = searchParams.get('linked');
+    const success = searchParams.get('success');
+    const error = searchParams.get('error');
+    const errorDescription = searchParams.get('description');
+
+    if (linkedProvider && success === 'true') {
+      toast.success(`Successfully linked your ${linkedProvider} account!`);
+      // Refresh user details to show the new linked account
+      queryClient.invalidateQueries({ queryKey: ['user-details'] });
+    } else if (error) {
+      const provider = searchParams.get('provider');
+      toast.error(`Failed to link ${provider || 'OAuth'} account: ${errorDescription || error}`);
+    }
+  }, [searchParams, queryClient]);
+
+  return null; // This component only handles side effects
+}
+
+function AccountPageContent() {
   const { user, logout } = useAuth();
   const { currentAgent } = useAgent();
   const queryClient = useQueryClient();
@@ -124,7 +149,10 @@ export default function AccountPage() {
   };
 
   return (
-    <ProtectedRoute>
+    <>
+      <Suspense fallback={null}>
+        <OAuthFeedbackHandler />
+      </Suspense>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -448,6 +476,14 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
+    </>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <ProtectedRoute>
+      <AccountPageContent />
     </ProtectedRoute>
   );
 }

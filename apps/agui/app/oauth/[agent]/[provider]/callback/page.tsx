@@ -23,42 +23,66 @@ function OAuthCallbackContent() {
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
 
+    // Check if this is an account linking operation
+    const oauthIntention = localStorage.getItem('oauthIntention');
+    const isLinking = oauthIntention === 'link';
+
     // Handle OAuth errors
     if (error) {
       console.error(`OAuth error from ${provider}:`, error, errorDescription);
-      router.push(`/login?error=oauth_failed&provider=${provider}&description=${encodeURIComponent(errorDescription || error)}`);
+      const redirectUrl = isLinking
+        ? `/account?error=oauth_failed&provider=${provider}&description=${encodeURIComponent(errorDescription || error)}`
+        : `/login?error=oauth_failed&provider=${provider}&description=${encodeURIComponent(errorDescription || error)}`;
+      router.push(redirectUrl);
       return;
     }
 
     if (accessToken && tokenType && role && userId) {
-      // Set the authentication state
-      const user = {
-        user_id: userId,
-        username: userId,
-        role: role as any, // Role comes as string from query params
-        api_role: role as any,
-        wa_role: undefined,
-        permissions: [],
-        created_at: new Date().toISOString(),
-        last_login: new Date().toISOString()
-      };
+      if (isLinking) {
+        // This is an account linking operation - don't change authentication
+        console.log(`Account linking successful for ${provider}`);
 
-      setToken(accessToken);
-      setUser(user);
+        // Clean up linking-specific localStorage items
+        localStorage.removeItem('oauthIntention');
+        localStorage.removeItem('oauthProvider');
 
-      // Store agent info with proper formatting
-      const agentName = agentId.charAt(0).toUpperCase() + agentId.slice(1);
-      localStorage.setItem('selectedAgentId', agentId);
-      localStorage.setItem('selectedAgentName', agentName);
-      localStorage.setItem('authProvider', provider);
+        // Redirect back to account page with success message
+        const returnUrl = localStorage.getItem('oauthReturnUrl') || '/account';
+        localStorage.removeItem('oauthReturnUrl');
+        router.push(`${returnUrl}?linked=${provider}&success=true`);
+      } else {
+        // This is a login operation - set authentication state
+        const user = {
+          user_id: userId,
+          username: userId,
+          role: role as any, // Role comes as string from query params
+          api_role: role as any,
+          wa_role: undefined,
+          permissions: [],
+          created_at: new Date().toISOString(),
+          last_login: new Date().toISOString()
+        };
 
-      // Redirect to dashboard or originally requested page
-      const returnUrl = localStorage.getItem('authReturnUrl') || '/';
-      localStorage.removeItem('authReturnUrl');
-      router.push(returnUrl);
+        setToken(accessToken);
+        setUser(user);
+
+        // Store agent info with proper formatting
+        const agentName = agentId.charAt(0).toUpperCase() + agentId.slice(1);
+        localStorage.setItem('selectedAgentId', agentId);
+        localStorage.setItem('selectedAgentName', agentName);
+        localStorage.setItem('authProvider', provider);
+
+        // Redirect to dashboard or originally requested page
+        const returnUrl = localStorage.getItem('authReturnUrl') || '/';
+        localStorage.removeItem('authReturnUrl');
+        router.push(returnUrl);
+      }
     } else {
-      // If no token, redirect to login with error
-      router.push(`/login?error=oauth_failed&provider=${provider}&agent=${agentId}`);
+      // If no token, redirect with error
+      const redirectUrl = isLinking
+        ? `/account?error=oauth_failed&provider=${provider}&agent=${agentId}`
+        : `/login?error=oauth_failed&provider=${provider}&agent=${agentId}`;
+      router.push(redirectUrl);
     }
   }, [searchParams, router, setUser, setToken, agentId, provider]);
 
