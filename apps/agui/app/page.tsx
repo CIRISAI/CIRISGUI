@@ -14,7 +14,7 @@ import { extractErrorMessage, getDiscordInvite } from '../lib/utils/error-helper
 import { ErrorModal } from '../components/ErrorModal';
 
 export default function InteractPage() {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const { currentAgent, isLoadingAgents } = useAgent();
 
   // CSS for task completion animation
@@ -822,31 +822,22 @@ export default function InteractPage() {
                       State: <span className="font-medium">{status.cognitive_state}</span>
                     </span>
                   )}
-                  <button
-                    onClick={() => setShowShutdownDialog(true)}
-                    className="ml-4 px-3 py-1 text-xs font-medium text-red-600 border border-red-600 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    Shutdown
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Check if user has permission (ADMIN or higher)
-                      if (user?.role === 'OBSERVER') {
-                        toast.error('WISE AUTHORITY OR SYSTEM AUTHORITY REQUIRED', {
-                          duration: 5000,
-                          style: {
-                            background: '#dc2626',
-                            color: 'white',
-                          },
-                        });
-                      } else {
-                        setShowEmergencyShutdownDialog(true);
-                      }
-                    }}
-                    className="ml-2 px-3 py-1 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    EMERGENCY STOP
-                  </button>
+                  {hasRole('ADMIN') && (
+                    <button
+                      onClick={() => setShowShutdownDialog(true)}
+                      className="ml-4 px-3 py-1 text-xs font-medium text-red-600 border border-red-600 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      Shutdown
+                    </button>
+                  )}
+                  {hasRole('AUTHORITY') && (
+                    <button
+                      onClick={() => setShowEmergencyShutdownDialog(true)}
+                      className="ml-2 px-3 py-1 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      EMERGENCY STOP
+                    </button>
+                  )}
                 </div>
               </div>
 
