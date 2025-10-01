@@ -278,6 +278,10 @@ export default function InteractPage() {
 
     // Simple approach: show one bar per task that has reached this step
     Array.from(activeTasks.entries()).forEach(([taskId, task]) => {
+      // Skip completed tasks - they shouldn't show progress bars anymore
+      if (task.completed) {
+        return;
+      }
       // Check if any thought in this task has reached this step
       const hasReachedStep = Array.from(task.thoughts.values()).some(thought => {
         const thoughtStep = thought.currentStep.toLowerCase();
