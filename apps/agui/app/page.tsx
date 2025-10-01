@@ -94,7 +94,11 @@ export default function InteractPage() {
   // Task-thought flow visualization state
   const [activeTasks, setActiveTasks] = useState<Map<string, {
     color: string;
-    thoughts: Map<string, { currentStep: string; completed: boolean }>;
+    thoughts: Map<string, {
+      currentStep: string;
+      completed: boolean;
+      stepsReached: Set<string>; // Track all steps this thought has reached
+    }>;
     completed: boolean;
   }>>(new Map());
 
@@ -236,9 +240,42 @@ export default function InteractPage() {
       const actionExecuted = stepResult?.action_executed;
       const isCompleted = actionExecuted === 'task_complete' || actionExecuted === 'task_reject';
 
+      // Map step to lane name for tracking
+      const getLaneName = (stepName: string) => {
+        const lower = stepName.toLowerCase();
+        if (['start_round', 'gather_context', 'perform_dmas', 'snapshot_and_context'].some(s => lower.includes(s))) {
+          return 'SNAPSHOT_AND_CONTEXT';
+        }
+        if (['perform_aspdma', 'recursive_aspdma', 'dma_results'].some(s => lower.includes(s))) {
+          return 'DMA_RESULTS';
+        }
+        if (['conscience_execution', 'recursive_conscience', 'aspdma_result'].some(s => lower.includes(s))) {
+          return 'ASPDMA_RESULT';
+        }
+        if (['finalize_action', 'conscience_result'].some(s => lower.includes(s))) {
+          return 'CONSCIENCE_RESULT';
+        }
+        if (['perform_action', 'action_complete', 'round_complete', 'action_result'].some(s => lower.includes(s))) {
+          return 'ACTION_RESULT';
+        }
+        return null;
+      };
+
+      const laneName = getLaneName(step);
+
+      // Get or create thought tracking
+      const existingThought = task.thoughts.get(thoughtId);
+      const stepsReached = existingThought?.stepsReached || new Set<string>();
+
+      // Add current lane to steps reached
+      if (laneName) {
+        stepsReached.add(laneName);
+      }
+
       task.thoughts.set(thoughtId, {
         currentStep: step,
-        completed: isCompleted
+        completed: isCompleted,
+        stepsReached
       });
 
       // Check if task is complete
@@ -275,64 +312,38 @@ export default function InteractPage() {
     });
   }, [taskColors]);
 
-  // Generate progress bars for a specific step - simplified approach
+  // Generate progress bars - one bar per thought that has reached this step
   const generateProgressBars = useCallback((stepName: string) => {
     const bars: React.ReactElement[] = [];
 
-    // Simple approach: show one bar per task that has reached this step
+    // Show one bar per thought that has reached this step
     Array.from(activeTasks.entries()).forEach(([taskId, task]) => {
       // Skip completed tasks - they shouldn't show progress bars anymore
       if (task.completed) {
         return;
       }
-      // Check if any thought in this task has reached this step
-      const hasReachedStep = Array.from(task.thoughts.values()).some(thought => {
-        const thoughtStep = thought.currentStep.toLowerCase();
-        const targetStep = stepName.toLowerCase();
 
-        // Simple mapping to check if thought has reached this step
-        if (targetStep.includes('snapshot') &&
-            (thoughtStep.includes('snapshot') || thoughtStep.includes('gather') || thoughtStep.includes('dmas'))) {
-          return true;
+      // For each thought in this task, check if it has reached this step
+      Array.from(task.thoughts.entries()).forEach(([thoughtId, thought]) => {
+        // Check if this thought has reached this step
+        if (thought.stepsReached.has(stepName)) {
+          // Check if this thought is currently at this step
+          const isCurrentlyAtThisStep = thought.currentStep.toLowerCase().includes(stepName.toLowerCase());
+
+          bars.push(
+            <div
+              key={`${taskId}-${thoughtId}-${stepName}`}
+              className={`w-4 h-4 rounded-full transition-all duration-300 ${task.color} ${
+                isCurrentlyAtThisStep ? 'animate-pulse ring-2 ring-white' : 'opacity-90'
+              }`}
+              title={`Task ${taskId.substring(0, 8)} - Thought ${thoughtId.substring(0, 8)}`}
+            />
+          );
         }
-        if (targetStep.includes('dma_results') &&
-            (thoughtStep.includes('aspdma') || thoughtStep.includes('dma_results'))) {
-          return true;
-        }
-        if (targetStep.includes('aspdma_result') &&
-            (thoughtStep.includes('conscience') || thoughtStep.includes('aspdma_result'))) {
-          return true;
-        }
-        if (targetStep.includes('conscience_result') &&
-            (thoughtStep.includes('finalize') || thoughtStep.includes('conscience_result'))) {
-          return true;
-        }
-        if (targetStep.includes('action_result') &&
-            (thoughtStep.includes('action') || thoughtStep.includes('complete'))) {
-          return true;
-        }
-        return false;
       });
-
-      if (hasReachedStep) {
-        // Check if currently active at this step
-        const isCurrentlyActive = Array.from(task.thoughts.values()).some(thought =>
-          thought.currentStep.toLowerCase().includes(stepName.toLowerCase())
-        );
-
-        bars.push(
-          <div
-            key={`${taskId}-${stepName}`}
-            className={`w-4 h-4 rounded-full transition-all duration-300 ${task.color} ${
-              isCurrentlyActive ? 'animate-pulse ring-2 ring-white' : 'opacity-70'
-            }`}
-            title={`Task ${taskId.split('-').pop()?.substring(0, 6)} - ${stepName}`}
-          />
-        );
-      }
     });
 
-    // Add empty indicators to show max capacity
+    // Add empty indicators to show capacity
     while (bars.length < 4) {
       bars.push(
         <div
@@ -342,7 +353,7 @@ export default function InteractPage() {
       );
     }
 
-    return bars.slice(0, 8); // Max 8 indicators
+    return bars.slice(0, 12); // Max 12 indicators to show multiple thoughts
   }, [activeTasks]);
 
   // Helper to get step index for ordering
