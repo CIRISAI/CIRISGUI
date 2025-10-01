@@ -46,77 +46,101 @@ export default function InteractPage() {
   }>({});
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Animation queue system to prevent React batching issues
-  const animationQueue = useRef<string[]>([]);
+  // Animation collection and queue system
+  const eventCollection = useRef<{step: string, timestamp: string, thoughtId?: string}[]>([]);
+  const collectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentlyAnimating = useRef(false);
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Process animation queue with delays to ensure each phase is visible
-  const processAnimationQueue = useCallback(async () => {
-    if (currentlyAnimating.current || animationQueue.current.length === 0) return;
+  // Process collected events into animation sequence
+  const processCollectedEvents = useCallback(async () => {
+    if (currentlyAnimating.current || eventCollection.current.length === 0) return;
 
-    console.log(`🎬 QUEUE: Starting animation queue processing with ${animationQueue.current.length} items`);
+    console.log(`🎬 COLLECT: Processing ${eventCollection.current.length} collected events`);
     currentlyAnimating.current = true;
 
-    // Process all items currently in queue (don't allow new items during processing)
-    const itemsToProcess = [...animationQueue.current];
-    animationQueue.current = []; // Clear queue to prevent interference
+    // Group events by thought to show parallel reasoning
+    const thoughtGroups = new Map<string, string[]>();
+    const eventsToProcess = [...eventCollection.current];
+    eventCollection.current = []; // Clear collection
 
-    for (const nextStep of itemsToProcess) {
+    // Organize steps by thought
+    eventsToProcess.forEach(event => {
+      const thoughtId = event.thoughtId || 'main';
+      if (!thoughtGroups.has(thoughtId)) {
+        thoughtGroups.set(thoughtId, []);
+      }
+      thoughtGroups.get(thoughtId)!.push(event.step);
+    });
+
+    // Create sequence: get unique steps in logical order
+    const stepOrder = ['DMAS', 'ACTION_SELECTION', 'CONSCIENCE', 'ACTION_COMPLETE'];
+    const uniqueSteps = new Set<string>();
+
+    eventsToProcess.forEach(event => uniqueSteps.add(event.step));
+    const orderedSteps = stepOrder.filter(step => uniqueSteps.has(step));
+
+    console.log(`🎬 COLLECT: Animation sequence: [${orderedSteps.join(' → ')}]`);
+    console.log(`🎬 COLLECT: Thoughts involved: ${Array.from(thoughtGroups.keys()).join(', ')}`);
+
+    // Animate each step in sequence
+    for (const step of orderedSteps) {
       const queueTime = new Date().toLocaleTimeString();
-      console.log(`🎬 QUEUE: Setting activeStep to '${nextStep}' at ${queueTime}`);
-      setActiveStep(nextStep);
+      console.log(`🎬 COLLECT: Setting activeStep to '${step}' at ${queueTime}`);
+      setActiveStep(step);
 
-      // Record the queued animation trigger time
+      // Record the animation trigger time
       setAnimationTriggers(prev => ({
         ...prev,
-        [nextStep]: queueTime
+        [step]: queueTime
       }));
 
       // Wait 800ms before next animation (ensures visibility)
       await new Promise(resolve => setTimeout(resolve, 800));
     }
 
-    console.log(`🎬 QUEUE: Animation queue processing complete`);
+    console.log(`🎬 COLLECT: Animation sequence complete`);
 
     // Clear after final step (with delay)
     animationTimeoutRef.current = setTimeout(() => {
-      console.log(`🎬 QUEUE: Clearing activeStep after sequence complete`);
+      console.log(`🎬 COLLECT: Clearing activeStep after sequence complete`);
       setActiveStep(null);
       currentlyAnimating.current = false; // Reset flag after clearing
     }, 2000);
   }, []);
 
-  // Add animation step to queue and start processing
-  const queueAnimationStep = useCallback((step: string) => {
-    const queueTime = new Date().toLocaleTimeString();
+  // Collect animation events with delay before processing
+  const collectAnimationEvent = useCallback((step: string, thoughtId?: string) => {
+    const collectTime = new Date().toLocaleTimeString();
 
     // BLOCK new events while animation is currently processing
     if (currentlyAnimating.current) {
-      console.log(`🎬 QUEUE: BLOCKING '${step}' - animation already in progress at ${queueTime}`);
+      console.log(`🎬 COLLECT: BLOCKING '${step}' - animation already in progress at ${collectTime}`);
       return;
     }
 
-    console.log(`🎬 QUEUE: Adding '${step}' to animation queue at ${queueTime}`);
+    console.log(`🎬 COLLECT: Adding '${step}' (thought: ${thoughtId || 'main'}) to collection at ${collectTime}`);
 
-    // Clear any existing timeout from previous sequences
-    if (animationTimeoutRef.current) {
-      clearTimeout(animationTimeoutRef.current);
-      animationTimeoutRef.current = null;
+    // Add to collection (allow duplicates from different thoughts)
+    eventCollection.current.push({
+      step,
+      timestamp: collectTime,
+      thoughtId
+    });
+
+    // Clear any existing collection timeout
+    if (collectionTimeoutRef.current) {
+      clearTimeout(collectionTimeoutRef.current);
     }
 
-    // Only add if it's different from the last item in queue (prevent duplicates)
-    const lastQueued = animationQueue.current[animationQueue.current.length - 1];
-    if (lastQueued !== step) {
-      animationQueue.current.push(step);
-      console.log(`🎬 QUEUE: Queue now has ${animationQueue.current.length} items: [${animationQueue.current.join(', ')}]`);
+    // Set new collection timeout (150ms to gather burst)
+    collectionTimeoutRef.current = setTimeout(() => {
+      console.log(`🎬 COLLECT: Collection timeout reached, processing ${eventCollection.current.length} events`);
+      processCollectedEvents();
+    }, 150);
 
-      // Start processing the queue
-      processAnimationQueue();
-    } else {
-      console.log(`🎬 QUEUE: Skipping duplicate step '${step}'`);
-    }
-  }, [processAnimationQueue]);
+    console.log(`🎬 COLLECT: Collection now has ${eventCollection.current.length} events, waiting 150ms for more...`);
+  }, [processCollectedEvents]);
 
   // Track when activeStep state actually changes (React render timing)
   useEffect(() => {
@@ -285,49 +309,50 @@ export default function InteractPage() {
             console.log('❌ No updated_thoughts found in update');
           }
 
-          // Process the step data for visualization
-          let stepToProcess = update.current_step;
-
-          // If no top-level current_step, try to get it from the first thought
-          if (!stepToProcess && update.updated_thoughts && update.updated_thoughts.length > 0) {
-            stepToProcess = update.updated_thoughts[0].current_step;
-            console.log(`🔄 Using step from thought: ${stepToProcess}`);
-          }
-
-          if (stepToProcess) {
+          // Process the step data for visualization - handle multiple thoughts
+          if (update.updated_thoughts && update.updated_thoughts.length > 0) {
             const animationStartTime = new Date().toLocaleTimeString();
-            console.log(`🕐 TIMING: Animation processing START: ${stepToProcess} at ${animationStartTime}`);
+            console.log(`🕐 TIMING: Animation processing START: ${update.updated_thoughts.length} thoughts at ${animationStartTime}`);
             console.log(`🕐 TIMING: Timeline: WebSocket(${wsReceiveTime}) → Parse(${parseStartTime}) → Animation(${animationStartTime})`);
 
-            // Determine which SVG circle should be lit based on the step
-            let newActiveStep: string | null = null;
+            // Process each thought
+            update.updated_thoughts.forEach((thought: any, thoughtIndex: number) => {
+              const stepToProcess = thought.current_step;
+              const thoughtId = thought.thought_id;
 
-            if (['start_round', 'gather_context'].includes(stepToProcess)) {
-              newActiveStep = 'DMAS';
-            } else if (['perform_dmas'].includes(stepToProcess)) {
-              newActiveStep = 'DMAS'; // Stay on DMAS until ASPDMA starts
-            } else if (['perform_aspdma', 'recursive_aspdma'].includes(stepToProcess)) {
-              newActiveStep = 'ACTION_SELECTION';
-            } else if (['conscience_execution', 'recursive_conscience'].includes(stepToProcess)) {
-              newActiveStep = 'CONSCIENCE';
-            } else if (['finalize_action', 'perform_action', 'action_complete', 'round_complete'].includes(stepToProcess)) {
-              newActiveStep = 'ACTION_COMPLETE';
-            }
+              if (stepToProcess) {
+                console.log(`🕐 TIMING: Processing thought ${thoughtIndex}: ${stepToProcess} (ID: ${thoughtId})`);
 
-            if (newActiveStep) {
+                // Determine which SVG circle should be lit based on the step
+                let newActiveStep: string | null = null;
 
-              const setStateTime = new Date().toLocaleTimeString();
-              console.log(`🕐 TIMING: Queuing animation step: ${newActiveStep} (from ${stepToProcess}) at ${setStateTime}`);
+                if (['start_round', 'gather_context'].includes(stepToProcess)) {
+                  newActiveStep = 'DMAS';
+                } else if (['perform_dmas'].includes(stepToProcess)) {
+                  newActiveStep = 'DMAS'; // Stay on DMAS until ASPDMA starts
+                } else if (['perform_aspdma', 'recursive_aspdma'].includes(stepToProcess)) {
+                  newActiveStep = 'ACTION_SELECTION';
+                } else if (['conscience_execution', 'recursive_conscience'].includes(stepToProcess)) {
+                  newActiveStep = 'CONSCIENCE';
+                } else if (['finalize_action', 'perform_action', 'action_complete', 'round_complete'].includes(stepToProcess)) {
+                  newActiveStep = 'ACTION_COMPLETE';
+                }
 
-              // Use animation queue instead of direct setState to prevent React batching issues
-              queueAnimationStep(newActiveStep);
+                if (newActiveStep) {
+                  const setStateTime = new Date().toLocaleTimeString();
+                  console.log(`🕐 TIMING: Collecting animation step: ${newActiveStep} (from ${stepToProcess}, thought: ${thoughtId}) at ${setStateTime}`);
 
-              console.log(`🕐 TIMING: Animation processing COMPLETE: ${stepToProcess} → ${newActiveStep} at ${new Date().toLocaleTimeString()}`);
-            } else {
-              console.log(`❓ No animation mapping for step: ${stepToProcess} at ${animationStartTime}`);
-            }
+                  // Use collection system to group events before animation
+                  collectAnimationEvent(newActiveStep, thoughtId);
+
+                  console.log(`🕐 TIMING: Animation processing COMPLETE: ${stepToProcess} → ${newActiveStep} at ${new Date().toLocaleTimeString()}`);
+                } else {
+                  console.log(`❓ No animation mapping for step: ${stepToProcess} at ${animationStartTime}`);
+                }
+              }
+            });
           } else {
-            console.log('❌ No step found in update or thoughts');
+            console.log('❌ No updated_thoughts found in update');
           }
 
           // Group data by taskId -> thoughtId -> steps
