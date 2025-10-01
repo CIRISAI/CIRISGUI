@@ -956,6 +956,10 @@ export default function InteractPage() {
                       .filter(([taskId, task]) => !task.completed) // Only show active (non-completed) tasks
                       .map(([taskId, task]) => {
                       const isCompleting = completingTasks.has(taskId);
+                      // Extract first 20 chars of description and last 4 chars of task ID
+                      const shortDesc = task.description?.substring(0, 20) || '';
+                      const last4 = taskId.slice(-4);
+                      const displayText = shortDesc ? `${shortDesc}:${last4}` : taskId.split('-').pop()?.substring(0, 6) || taskId.substring(0, 6);
                       return (
                         <div
                           key={taskId}
@@ -968,7 +972,7 @@ export default function InteractPage() {
                           }`}
                           title={task.description || `Task ${taskId} - ${task.thoughts.size} thoughts${isCompleting ? ' (Completing!)' : ''}`}
                         >
-                          {task.description || taskId.split('-').pop()?.substring(0, 6) || taskId.substring(0, 6)}
+                          {displayText}
                           {isCompleting && <span className="ml-1">→</span>}
                         </div>
                       );
