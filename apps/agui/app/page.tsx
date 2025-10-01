@@ -941,7 +941,9 @@ export default function InteractPage() {
                 {activeTasks.size > 0 && (
                   <div className="flex items-center space-x-2">
                     <span className="text-sm text-gray-600">Active Tasks:</span>
-                    {Array.from(activeTasks.entries()).map(([taskId, task]) => {
+                    {Array.from(activeTasks.entries())
+                      .filter(([taskId, task]) => !task.completed) // Only show active (non-completed) tasks
+                      .map(([taskId, task]) => {
                       const isCompleting = completingTasks.has(taskId);
                       return (
                         <div
@@ -1145,7 +1147,6 @@ export default function InteractPage() {
           <div className="mt-6 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 shadow rounded-lg">
             <div className="px-4 py-3">
               <div className="flex items-center">
-                <span className="text-lg mr-2">🎉</span>
                 <h3 className="text-md font-medium text-green-800 mr-4">
                   Recently Completed Tasks:
                 </h3>
