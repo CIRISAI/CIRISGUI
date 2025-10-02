@@ -35,6 +35,11 @@ function OAuthCallbackContent() {
       const error = searchParams.get('error');
       const errorDescription = searchParams.get('error_description');
 
+      // Set the token in the SDK BEFORE making any API calls
+      if (accessToken) {
+        cirisClient.auth.setAccessToken(accessToken);
+      }
+
       // Check if this is an account linking operation
       const oauthIntention = localStorage.getItem('oauthIntention');
       const isLinking = oauthIntention === 'link';
