@@ -626,11 +626,15 @@ export default function InteractPage() {
                         task.completed = true;
                         newTasks.set(taskId, task);
 
-                        // Add to recently completed
-                        setRecentlyCompletedTasks(prevCompleted => [
-                          ...prevCompleted,
-                          { taskId, color: task.color, completedAt: new Date() }
-                        ]);
+                        // Add to recently completed (deduplicate by taskId)
+                        setRecentlyCompletedTasks(prevCompleted => {
+                          const alreadyCompleted = prevCompleted.some(t => t.taskId === taskId);
+                          if (alreadyCompleted) return prevCompleted;
+                          return [
+                            ...prevCompleted,
+                            { taskId, color: task.color, completedAt: new Date() }
+                          ];
+                        });
                       }
                       return newTasks;
                     });
