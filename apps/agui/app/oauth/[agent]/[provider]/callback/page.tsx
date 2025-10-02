@@ -17,6 +17,10 @@ function OAuthCallbackContent() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      // Ensure SDK has a base URL configured
+      const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
+      cirisClient.setConfig({ baseURL });
+
       // Handle the OAuth token response from API
       const accessToken = searchParams.get('access_token');
       const tokenType = searchParams.get('token_type');
