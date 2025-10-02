@@ -848,9 +848,9 @@ export default function InteractPage() {
 
   return (
     <ProtectedRoute>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-6 max-w-7xl mx-auto">
           <p className="text-sm text-gray-600">
             Ask {currentAgent?.agent_name || 'Datum'} a question about CIRIS or an ethical dilemma, and see the reasoning below. Note the agent may choose not to answer.
           </p>
@@ -861,10 +861,12 @@ export default function InteractPage() {
           <NoAgentsPlaceholder />
         )}
 
-        {/* Only show chat interface if agent is selected */}
+        {/* Desktop: Side by side, Mobile: Stacked */}
         {currentAgent && (
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Chat Interface - Left Column on Desktop */}
+            <div className="bg-white shadow rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-900">
                   Agent Communications
@@ -970,12 +972,10 @@ export default function InteractPage() {
               </form>
             </div>
           </div>
-        )}
 
-        {/* Simple Reasoning Visualization */}
-        {currentAgent && (
-          <div className="mt-6 bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
+            {/* Reasoning Visualization - Right Column on Desktop */}
+            <div className="bg-white shadow rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
               {/* Active Tasks Row - Below text entry */}
               {activeTasks.size > 0 && (
                 <div className="mb-6">
@@ -1217,9 +1217,11 @@ export default function InteractPage() {
               )}
             </div>
           </div>
+          </div>
         )}
 
-        {/* Overflow Tasks Row (5+) - Above completed tasks */}
+        {/* Overflow Tasks Row (5+) - Above completed tasks - Full width below grid */}
+        <div className="max-w-7xl mx-auto">
         {currentAgent && activeTasks.size > 0 && (
           <>
             {Array.from(activeTasks.entries())
@@ -1727,6 +1729,7 @@ export default function InteractPage() {
           message={errorModal.message}
           details={errorModal.details}
         />
+        </div>
       </div>
     </ProtectedRoute>
   );
