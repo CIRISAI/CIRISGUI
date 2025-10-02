@@ -982,6 +982,7 @@ export default function InteractPage() {
                   <div className="flex items-center justify-center space-x-3 mb-4">
                     {Array.from(activeTasks.entries())
                       .filter(([taskId, task]) => !task.completed)
+                      .slice(0, 4) // First 4 tasks only
                       .map(([taskId, task]) => {
                         const isCompleting = completingTasks.has(taskId);
                         const shortDesc = task.description?.substring(0, 20) || '';
@@ -1216,6 +1217,43 @@ export default function InteractPage() {
               )}
             </div>
           </div>
+        )}
+
+        {/* Overflow Tasks Row (5+) - Above completed tasks */}
+        {currentAgent && activeTasks.size > 0 && (
+          <>
+            {Array.from(activeTasks.entries())
+              .filter(([taskId, task]) => !task.completed)
+              .slice(4) // Tasks 5+ (overflow)
+              .length > 0 && (
+              <div className="mt-6 bg-white shadow rounded-lg">
+                <div className="px-4 py-3">
+                  <div className="flex items-center justify-center space-x-3">
+                    {Array.from(activeTasks.entries())
+                      .filter(([taskId, task]) => !task.completed)
+                      .slice(4)
+                      .map(([taskId, task]) => {
+                        const isCompleting = completingTasks.has(taskId);
+                        const shortDesc = task.description?.substring(0, 20) || '';
+                        const last4 = taskId.slice(-4);
+                        const displayText = shortDesc ? `${shortDesc}:${last4}` : taskId.split('-').pop()?.substring(0, 6) || taskId.substring(0, 6);
+                        return (
+                          <div
+                            key={taskId}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium text-white ${task.color} ${
+                              isCompleting ? 'task-completing' : 'shadow-md'
+                            }`}
+                            title={task.description || `Task ${taskId} - ${task.thoughts.size} thoughts`}
+                          >
+                            {displayText}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Recently Completed Tasks Banner */}
