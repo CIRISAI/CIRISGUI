@@ -1027,9 +1027,9 @@ export default function InteractPage() {
               </div>
 
               {/* Reasoning Lanes - Vertical Beam Flow */}
-              <div className="mb-6">
-                {/* Task beams flowing through steps */}
-                <div className="flex justify-center space-x-8">
+              <div className="mb-6 relative">
+                {/* Task beams flowing through steps - absolutely positioned overlay */}
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 flex space-x-8 pointer-events-none z-10">
                   {Array.from(activeTasks.entries())
                     .filter(([taskId, task]) => !task.completed)
                     .map(([taskId, task]) => (
@@ -1069,7 +1069,7 @@ export default function InteractPage() {
                     ))}
                 </div>
 
-                <div className="space-y-3 mt-6">
+                <div className="space-y-3">
                   {/* Lane 1: SNAPSHOT_AND_CONTEXT */}
                   <div className={`flex items-center p-4 rounded-lg border-2 transition-all duration-300 ${
                     activeStep === 'SNAPSHOT_AND_CONTEXT'
@@ -1086,10 +1086,6 @@ export default function InteractPage() {
                     <div className="ml-4 flex-1">
                       <h4 className="font-medium text-gray-900">SNAPSHOT & CONTEXT</h4>
                       <p className="text-sm text-gray-600">Gather system state and context</p>
-                    </div>
-                    <div className="flex space-x-1">
-                      {/* Task-thought progress indicators */}
-                      {generateProgressBars('SNAPSHOT_AND_CONTEXT')}
                     </div>
                   </div>
 
@@ -1110,10 +1106,6 @@ export default function InteractPage() {
                       <h4 className="font-medium text-gray-900">DMA ANALYSIS</h4>
                       <p className="text-sm text-gray-600">Analyze situation with CSDMA, DSDMA, ASPDMA</p>
                     </div>
-                    <div className="flex space-x-1">
-                      {/* Task-thought progress indicators */}
-                      {generateProgressBars('DMA_RESULTS')}
-                    </div>
                   </div>
 
                   {/* Lane 3: ASPDMA_RESULT */}
@@ -1133,10 +1125,6 @@ export default function InteractPage() {
                       <h4 className="font-medium text-gray-900">ACTION SELECTION</h4>
                       <p className="text-sm text-gray-600">Choose optimal action with rationale</p>
                     </div>
-                    <div className="flex space-x-1">
-                      {/* Task-thought progress indicators */}
-                      {generateProgressBars('ASPDMA_RESULT')}
-                    </div>
                   </div>
 
                   {/* Lane 4: CONSCIENCE_RESULT */}
@@ -1155,10 +1143,6 @@ export default function InteractPage() {
                     <div className="ml-4 flex-1">
                       <h4 className="font-medium text-gray-900">CONSCIENCE CHECK</h4>
                       <p className="text-sm text-gray-600">Ethical evaluation and final decision</p>
-                    </div>
-                    <div className="flex space-x-1">
-                      {/* Task-thought progress indicators */}
-                      {generateProgressBars('CONSCIENCE_RESULT')}
                     </div>
                     {/* Conscience Result Indicator */}
                     {conscienceResult && activeStep === 'CONSCIENCE_RESULT' && (
@@ -1189,9 +1173,6 @@ export default function InteractPage() {
                       <h4 className="font-medium text-gray-900">ACTION EXECUTION</h4>
                       <p className="text-sm text-gray-600">Perform action and generate audit trail</p>
                     </div>
-                    <div className="flex space-x-1">
-                      {/* Task-thought progress indicators */}
-                      {generateProgressBars('ACTION_RESULT')}
                     </div>
                   </div>
                 </div>
