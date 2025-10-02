@@ -542,166 +542,90 @@ export default function InteractPage() {
           console.log('✅ Stream connected:', eventData);
           setStreamConnected(true);
           setStreamError(null);
-        } else if (eventType === 'thought_start') {
-          // New THOUGHT_START event - contains thought + task metadata
-          const thoughtStart = JSON.parse(eventData);
-          console.log('🎬 THOUGHT_START received:', thoughtStart);
-
-          const thoughtId = thoughtStart.thought_id;
-          const taskId = thoughtStart.task_id;
-          const taskDescription = thoughtStart.task_description;
-
-          if (thoughtId && taskId) {
-            // Initialize task with description
-            updateTaskThoughtFlow(thoughtId, taskId, 'thought_start', null, taskDescription);
-
-            // Trigger THOUGHT_START animation
-            collectAnimationEvent('THOUGHT_START', thoughtId);
-          }
         } else if (eventType === 'step_update') {
-          const parseStartTime = new Date().toLocaleTimeString();
+          // Handle new event structure: {"events": [{event_type: "...", ...}]}
           const update = JSON.parse(eventData);
-          const parseEndTime = new Date().toLocaleTimeString();
 
-          // Minimal logging - only log errors
-          // console.log(`🕐 TIMING: Step update parsing: Start ${parseStartTime} → End ${parseEndTime}`);
-          // console.log('📊 Step update received:', update.updated_thoughts?.length || 0, 'thoughts');
+          if (update.events && Array.isArray(update.events)) {
+            update.events.forEach((event: any) => {
+              const eventType = event.event_type;
+              const thoughtId = event.thought_id;
+              const taskId = event.task_id;
 
-          // Process the step data for visualization - handle multiple thoughts
-          if (update.updated_thoughts && update.updated_thoughts.length > 0) {
-            const animationStartTime = new Date().toLocaleTimeString();
-            // console.log(`🕐 TIMING: Animation processing START: ${update.updated_thoughts.length} thoughts at ${animationStartTime}`);
-            // console.log(`🕐 TIMING: Timeline: WebSocket(${wsReceiveTime}) → Parse(${parseStartTime}) → Animation(${animationStartTime})`);
+              if (!thoughtId || !taskId) return;
 
-            // Process each thought
-            update.updated_thoughts.forEach((thought: any, thoughtIndex: number) => {
-              const stepToProcess = thought.current_step;
-              const thoughtId = thought.thought_id;
-              const taskId = thought.task_id;
+              // Handle each event type
+              if (eventType === 'thought_start') {
+                console.log('🎬 THOUGHT_START:', event);
+                updateTaskThoughtFlow(thoughtId, taskId, 'THOUGHT_START', null, event.task_description);
+                collectAnimationEvent('THOUGHT_START', thoughtId);
 
-              if (stepToProcess && thoughtId && taskId) {
-                // console.log(`🕐 TIMING: Processing thought ${thoughtIndex}: ${stepToProcess} (ID: ${thoughtId}, Task: ${taskId})`);
+              } else if (eventType === 'snapshot_and_context') {
+                console.log('📸 SNAPSHOT_AND_CONTEXT:', event);
+                updateTaskThoughtFlow(thoughtId, taskId, 'SNAPSHOT_AND_CONTEXT', event);
+                collectAnimationEvent('SNAPSHOT_AND_CONTEXT', thoughtId);
 
-                // Update task-thought flow visualization
-                // console.log(`🎨 STREAM: Calling updateTaskThoughtFlow(${thoughtId}, ${taskId}, ${stepToProcess})`);
-                updateTaskThoughtFlow(thoughtId, taskId, stepToProcess, thought.step_result);
+              } else if (eventType === 'dma_results') {
+                console.log('🧠 DMA_RESULTS:', event);
+                updateTaskThoughtFlow(thoughtId, taskId, 'DMA_RESULTS', event);
+                collectAnimationEvent('DMA_RESULTS', thoughtId);
 
-                // Determine which reasoning lane should be lit based on the step (supports old + new names)
-                let newActiveStep: string | null = null;
+              } else if (eventType === 'aspdma_result') {
+                console.log('🎯 ASPDMA_RESULT:', event);
+                updateTaskThoughtFlow(thoughtId, taskId, 'ASPDMA_RESULT', event);
+                collectAnimationEvent('ASPDMA_RESULT', thoughtId);
 
-                // Lane 1: SNAPSHOT_AND_CONTEXT (Gather + Context)
-                if (['start_round', 'gather_context', 'perform_dmas', 'snapshot_and_context'].includes(stepToProcess)) {
-                  newActiveStep = 'SNAPSHOT_AND_CONTEXT';
+              } else if (eventType === 'conscience_result') {
+                console.log('✅ CONSCIENCE_RESULT:', event);
+                updateTaskThoughtFlow(thoughtId, taskId, 'CONSCIENCE_RESULT', event);
+                collectAnimationEvent('CONSCIENCE_RESULT', thoughtId);
 
-                // Lane 2: DMA_RESULTS (Analyze situation)
-                } else if (['perform_aspdma', 'recursive_aspdma', 'dma_results'].includes(stepToProcess)) {
-                  newActiveStep = 'DMA_RESULTS';
+                // Store conscience result for display
+                setConscienceResult({
+                  passed: event.conscience_passed,
+                  reasoning: event.epistemic_data?.reasoning || 'No reasoning provided'
+                });
 
-                // Lane 3: ASPDMA_RESULT (Action selection)
-                } else if (['conscience_execution', 'recursive_conscience', 'aspdma_result'].includes(stepToProcess)) {
-                  newActiveStep = 'ASPDMA_RESULT';
+              } else if (eventType === 'action_result') {
+                console.log('⚡ ACTION_RESULT:', event);
+                updateTaskThoughtFlow(thoughtId, taskId, 'ACTION_RESULT', event);
+                collectAnimationEvent('ACTION_RESULT', thoughtId);
 
-                // Lane 4: CONSCIENCE_RESULT (Ethical check)
-                } else if (['finalize_action', 'conscience_result'].includes(stepToProcess)) {
-                  newActiveStep = 'CONSCIENCE_RESULT';
+                // Check if task is complete
+                if (event.action_executed === 'task_complete' || event.action_executed === 'task_reject') {
+                  // Mark task as completing
+                  setCompletingTasks(prev => new Set(prev).add(taskId));
 
-                // Lane 5: ACTION_RESULT (Execute action)
-                } else if (['perform_action', 'action_complete', 'round_complete', 'action_result'].includes(stepToProcess)) {
-                  newActiveStep = 'ACTION_RESULT';
-                }
+                  // Mark task as completed after animation
+                  setTimeout(() => {
+                    setActiveTasks(prev => {
+                      const newTasks = new Map(prev);
+                      const task = newTasks.get(taskId);
+                      if (task) {
+                        task.completed = true;
+                        newTasks.set(taskId, task);
 
-                if (newActiveStep) {
-                  const setStateTime = new Date().toLocaleTimeString();
-                  // console.log(`🕐 TIMING: Collecting animation step: ${newActiveStep} (from ${stepToProcess}, thought: ${thoughtId}) at ${setStateTime}`);
+                        // Add to recently completed
+                        setRecentlyCompletedTasks(prevCompleted => [
+                          ...prevCompleted,
+                          { taskId, color: task.color, completedAt: new Date() }
+                        ]);
+                      }
+                      return newTasks;
+                    });
 
-                  // Use collection system to group events before animation
-                  collectAnimationEvent(newActiveStep, thoughtId);
-
-                  // console.log(`🕐 TIMING: Animation processing COMPLETE: ${stepToProcess} → ${newActiveStep} at ${new Date().toLocaleTimeString()}`);
-                } else {
-                  // console.log(`❓ No animation mapping for step: ${stepToProcess} at ${animationStartTime}`);
+                    setCompletingTasks(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete(taskId);
+                      return newSet;
+                    });
+                  }, 2000);
                 }
               }
             });
           } else {
-            console.log('❌ No updated_thoughts found in update');
+            console.log('❌ No events array found in step_update');
           }
-
-          // Group data by taskId -> thoughtId -> steps
-          if (update.updated_thoughts && update.updated_thoughts.length > 0) {
-            const thought = update.updated_thoughts[0];
-            const taskId = thought.task_id;
-            const thoughtId = thought.thought_id;
-            const currentStep = thought.current_step;
-            const processingTime = thought.step_result?.processing_time_ms || thought.processing_time_ms || 0;
-
-            // console.log(`📊 Adding step to task ${taskId}, thought ${thoughtId}: ${currentStep} (${processingTime}ms)`);
-
-            setTaskData(prev => {
-              const newMap = new Map(prev);
-
-              // Get or create task entry
-              let taskMap = newMap.get(taskId);
-              if (!taskMap) {
-                taskMap = new Map();
-                newMap.set(taskId, taskMap);
-              }
-
-              // Get or create thought entry
-              let thoughtSteps = taskMap.get(thoughtId);
-              if (!thoughtSteps) {
-                thoughtSteps = [];
-                taskMap.set(thoughtId, thoughtSteps);
-              }
-
-              // Add step data - capture all the step information
-              thoughtSteps.push({
-                step: currentStep,
-                processingTime: processingTime,
-                timestamp: thought.current_step_started_at || update.timestamp,
-                stepResult: {
-                  step_point: currentStep,
-                  success: thought.success,
-                  timestamp: thought.timestamp || thought.current_step_started_at || update.timestamp,
-                  processing_time_ms: processingTime,
-                  context: thought.context,
-                  summary: thought.summary,
-                  action_result: thought.action_result,
-                  selected_action: thought.selected_action,
-                  action_parameters: thought.action_parameters,
-                  context_size: thought.context_size,
-                  thoughts_processed: thought.thoughts_processed,
-                  round_status: thought.round_status,
-                  conscience_passed: thought.conscience_passed,
-                  dma_results: thought.dma_results,
-                  selection_reasoning: thought.selection_reasoning,
-                  dispatch_context: thought.dispatch_context,
-                  ...thought.step_result // Include any additional step_result data
-                },
-                status: thought.status
-              });
-
-              // Check for conscience results
-              if (currentStep === 'conscience_execution' || currentStep === 'finalize_action') {
-                if (thought.conscience_passed !== undefined || thought.selection_reasoning) {
-                  console.log(`🎯 Conscience result detected: passed=${thought.conscience_passed}, reasoning available=${!!thought.selection_reasoning}`);
-                  setConscienceResult({
-                    passed: thought.conscience_passed === true,
-                    reasoning: thought.selection_reasoning
-                  });
-
-                  // Clear conscience result after 5 seconds
-                  setTimeout(() => {
-                    setConscienceResult(null);
-                  }, 5000);
-                }
-              }
-
-              console.log(`📊 Task ${taskId} now has ${taskMap.size} thoughts, thought ${thoughtId} has ${thoughtSteps.length} steps`);
-              return newMap;
-            });
-          }
-
         } else if (eventType === 'keepalive') {
           console.log('💓 Keepalive:', eventData);
         } else if (eventType === 'error') {
