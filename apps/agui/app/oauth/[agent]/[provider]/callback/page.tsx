@@ -4,6 +4,7 @@ import { useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter, useParams } from 'next/navigation';
 import { useAuth } from '../../../../../contexts/AuthContext';
 import { cirisClient } from '../../../../../lib/ciris-sdk';
+import { AuthStore } from '../../../../../lib/ciris-sdk/auth-store';
 
 function OAuthCallbackContent() {
   const searchParams = useSearchParams();
@@ -36,8 +37,15 @@ function OAuthCallbackContent() {
       const errorDescription = searchParams.get('error_description');
 
       // Set the token in the SDK BEFORE making any API calls
-      if (accessToken) {
-        cirisClient.auth.setAccessToken(accessToken);
+      if (accessToken && tokenType && role && userId) {
+        AuthStore.saveToken({
+          access_token: accessToken,
+          token_type: tokenType,
+          expires_in: 3600, // Default 1 hour
+          user_id: userId,
+          role: role,
+          created_at: Date.now()
+        });
       }
 
       // Check if this is an account linking operation
