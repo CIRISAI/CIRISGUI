@@ -554,6 +554,27 @@ export default function InteractPage() {
 
               if (!thoughtId || !taskId) return;
 
+              // Store event data in taskData for detailed view
+              setTaskData(prev => {
+                const newMap = new Map(prev);
+                let taskMap = newMap.get(taskId);
+                if (!taskMap) {
+                  taskMap = new Map();
+                  newMap.set(taskId, taskMap);
+                }
+                let thoughtEvents = taskMap.get(thoughtId);
+                if (!thoughtEvents) {
+                  thoughtEvents = [];
+                  taskMap.set(thoughtId, thoughtEvents);
+                }
+                thoughtEvents.push({
+                  event_type: eventType,
+                  timestamp: event.timestamp,
+                  data: event
+                });
+                return newMap;
+              });
+
               // Handle each event type
               if (eventType === 'thought_start') {
                 console.log('🎬 THOUGHT_START:', event);
@@ -1297,130 +1318,96 @@ export default function InteractPage() {
                               </span>
                             </summary>
                             <div className="p-2 space-y-2">
-                              {steps.map((step, index) => {
-                                const stepData = step.stepResult || {};
-                                const stepPoint = stepData.step_point || step.step || 'unknown_step';
-                                const success = stepData.success;
-                                const processingTime = stepData.processing_time_ms || step.processingTime || 0;
-                                const timestamp = stepData.timestamp || step.timestamp;
+                              {steps.map((eventData, index) => {
+                                const eventType = eventData.event_type;
+                                const timestamp = eventData.timestamp;
+                                const data = eventData.data;
 
-                                // Status icon based on success
-                                const statusIcon = success === true ? '✅' : success === false ? '❌' : '🔄';
-                                const statusText = success === true ? 'Success' : success === false ? 'Failed' : 'Processing';
-                                const statusColor = success === true ? 'text-green-600' : success === false ? 'text-red-600' : 'text-blue-600';
+                                // Event type icons and colors
+                                const eventIcons: Record<string, string> = {
+                                  'thought_start': '🎬',
+                                  'snapshot_and_context': '📸',
+                                  'dma_results': '🧠',
+                                  'aspdma_result': '🎯',
+                                  'conscience_result': '✅',
+                                  'action_result': '⚡'
+                                };
 
-                                // Determine which animation phase this step belongs to
-                                let animationPhase = null;
-                                if (['start_round', 'gather_context', 'perform_dmas'].includes(stepPoint)) {
-                                  animationPhase = 'DMAS';
-                                } else if (['perform_aspdma', 'recursive_aspdma'].includes(stepPoint)) {
-                                  animationPhase = 'ACTION_SELECTION';
-                                } else if (['conscience_execution', 'recursive_conscience'].includes(stepPoint)) {
-                                  animationPhase = 'CONSCIENCE';
-                                } else if (['finalize_action', 'perform_action', 'action_complete', 'round_complete'].includes(stepPoint)) {
-                                  animationPhase = 'ACTION_COMPLETE';
-                                }
-                                const animationTriggerTime = animationPhase ? animationTriggers[animationPhase as keyof typeof animationTriggers] : null;
+                                const eventColors: Record<string, string> = {
+                                  'thought_start': 'text-blue-600',
+                                  'snapshot_and_context': 'text-purple-600',
+                                  'dma_results': 'text-pink-600',
+                                  'aspdma_result': 'text-orange-600',
+                                  'conscience_result': 'text-green-600',
+                                  'action_result': 'text-red-600'
+                                };
 
                                 return (
                                   <div key={index} className="bg-white border rounded p-2">
                                     <div className="flex justify-between items-start mb-2">
-                                      <span className="text-sm font-medium text-gray-900">
-                                        {stepPoint.replace('_', ' ').toUpperCase()}
+                                      <span className={`text-sm font-medium ${eventColors[eventType] || 'text-gray-900'}`}>
+                                        {eventIcons[eventType] || '📄'} {eventType.replace(/_/g, ' ').toUpperCase()}
                                       </span>
                                       <div className="flex items-center space-x-2 text-xs">
-                                        <span className="font-medium text-gray-600">{processingTime}ms</span>
-                                        <span className={`flex items-center space-x-1 ${statusColor}`}>
-                                          <span>{statusIcon}</span>
-                                          <span className="hidden sm:inline">{statusText}</span>
-                                        </span>
                                         <div className="text-gray-400 text-right">
-                                          <div>Data: {timestamp ? new Date(timestamp).toLocaleTimeString() : 'N/A'}</div>
-                                          {animationTriggerTime && (
-                                            <div className={`text-${animationPhase === activeStep ? 'blue' : 'purple'}-600 font-medium`}>
-                                              Anim: {animationTriggerTime}
-                                            </div>
-                                          )}
+                                          <div>{timestamp ? new Date(timestamp).toLocaleTimeString() : 'N/A'}</div>
                                         </div>
                                       </div>
                                     </div>
 
-                                    {/* Format key data fields nicely */}
-                                    {stepData.summary && (
+                                    {/* Display event-specific data */}
+
+                                    {/* Task description from thought_start */}
+                                    {data.task_description && (
                                       <div className="mb-2 p-2 bg-blue-50 rounded text-xs">
-                                        <div className="font-medium text-blue-800 mb-1">Summary</div>
-                                        <div className="text-blue-700 break-words">
-                                          {stepData.summary.length > 200
-                                            ? `${stepData.summary.substring(0, 200)}...`
-                                            : stepData.summary}
-                                        </div>
+                                        <div className="font-medium text-blue-800 mb-1">Task Description</div>
+                                        <div className="text-blue-700 break-words">{data.task_description}</div>
                                       </div>
                                     )}
 
-                                    {stepData.context && (
+                                    {/* Context from snapshot_and_context */}
+                                    {data.context && (
                                       <details className="text-xs mb-2">
                                         <summary className="cursor-pointer text-green-600 hover:text-green-800 font-medium">
-                                          Context Data ({typeof stepData.context === 'string' ? stepData.context.length : 'object'} {typeof stepData.context === 'string' ? 'chars' : 'properties'})
+                                          Context Data ({typeof data.context === 'string' ? data.context.length : 'object'} {typeof data.context === 'string' ? 'chars' : 'properties'})
                                         </summary>
                                         <div className="mt-1 p-2 bg-green-50 rounded text-green-700">
-                                          {typeof stepData.context === 'string' ? (
-                                            <div className="space-y-2">
-                                              <div className="text-xs text-green-600 mb-2">String content preview:</div>
-                                              <div className="max-h-32 overflow-y-auto bg-white p-2 rounded border text-xs font-mono break-all">
-                                                {stepData.context.substring(0, 1000)}
-                                                {stepData.context.length > 1000 && '...'}
-                                              </div>
-                                              <details className="mt-2">
-                                                <summary className="cursor-pointer text-green-600 hover:text-green-800 text-xs">
-                                                  View Full String ({stepData.context.length} chars)
-                                                </summary>
-                                                <pre className="mt-1 p-2 bg-white rounded border max-h-64 overflow-auto text-xs whitespace-pre-wrap break-words">
-                                                  {stepData.context}
-                                                </pre>
-                                              </details>
-                                            </div>
-                                          ) : (
-                                            <div className="space-y-2">
-                                              <div className="text-xs text-green-600 mb-2">Object structure:</div>
-                                              <div className="max-h-32 overflow-y-auto bg-white p-2 rounded border">
-                                                <pre className="text-xs whitespace-pre-wrap break-words">
-                                                  {JSON.stringify(stepData.context, null, 2).substring(0, 800)}
-                                                  {JSON.stringify(stepData.context, null, 2).length > 800 && '\n...'}
-                                                </pre>
-                                              </div>
-                                              <details className="mt-2">
-                                                <summary className="cursor-pointer text-green-600 hover:text-green-800 text-xs">
-                                                  View Full Object
-                                                </summary>
-                                                <pre className="mt-1 p-2 bg-white rounded border max-h-64 overflow-auto text-xs whitespace-pre-wrap break-words">
-                                                  {JSON.stringify(stepData.context, null, 2)}
-                                                </pre>
-                                              </details>
-                                            </div>
-                                          )}
+                                          <pre className="text-xs overflow-auto max-h-32 whitespace-pre-wrap break-words">
+                                            {typeof data.context === 'string' ? data.context.substring(0, 500) : JSON.stringify(data.context, null, 2).substring(0, 500)}
+                                            {(typeof data.context === 'string' ? data.context.length : JSON.stringify(data.context).length) > 500 && '...'}
+                                          </pre>
                                         </div>
                                       </details>
                                     )}
 
-                                    {stepData.action_result && (
+                                    {/* Selected action from aspdma_result */}
+                                    {data.selected_action && (
+                                      <div className="mb-2 p-2 bg-yellow-50 rounded text-xs">
+                                        <div className="font-medium text-yellow-800 mb-1">Selected Action</div>
+                                        <div className="text-yellow-700">{data.selected_action}</div>
+                                      </div>
+                                    )}
+
+                                    {/* Action rationale from aspdma_result */}
+                                    {data.action_rationale && (
                                       <details className="text-xs mb-2">
                                         <summary className="cursor-pointer text-purple-600 hover:text-purple-800 font-medium">
-                                          Action Result ({stepData.action_result.length} chars)
+                                          Action Result ({data.action_result.length} chars)
                                         </summary>
                                         <div className="mt-1 p-2 bg-purple-50 rounded text-purple-700">
                                           <div className="space-y-2">
                                             <div className="text-xs text-purple-600 mb-2">Content preview:</div>
                                             <div className="max-h-24 overflow-y-auto bg-white p-2 rounded border text-xs break-words">
-                                              {stepData.action_result.substring(0, 300)}
-                                              {stepData.action_result.length > 300 && '...'}
+                                              {data.action_result.substring(0, 300)}
+                                              {data.action_result.length > 300 && '...'}
                                             </div>
-                                            {stepData.action_result.length > 300 && (
+                                            {data.action_result.length > 300 && (
                                               <details className="mt-2">
                                                 <summary className="cursor-pointer text-purple-600 hover:text-purple-800 text-xs">
-                                                  View Full Content ({stepData.action_result.length} chars)
+                                                  View Full Content ({data.action_result.length} chars)
                                                 </summary>
                                                 <pre className="mt-1 p-2 bg-white rounded border max-h-64 overflow-auto text-xs whitespace-pre-wrap break-words">
-                                                  {stepData.action_result}
+                                                  {data.action_result}
                                                 </pre>
                                               </details>
                                             )}
@@ -1429,48 +1416,48 @@ export default function InteractPage() {
                                       </details>
                                     )}
 
-                                    {stepData.selected_action && (
+                                    {data.selected_action && (
                                       <div className="mb-2 p-2 bg-yellow-50 rounded text-xs">
                                         <div className="font-medium text-yellow-800 mb-1">Selected Action</div>
-                                        <div className="text-yellow-700">{stepData.selected_action}</div>
+                                        <div className="text-yellow-700">{data.selected_action}</div>
                                       </div>
                                     )}
 
-                                    {stepData.selection_reasoning && (
+                                    {data.selection_reasoning && (
                                       <details className="text-xs mb-2">
                                         <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium">
-                                          🎯 Conscience Reasoning ({stepData.selection_reasoning.length} chars)
+                                          🎯 Conscience Reasoning ({data.selection_reasoning.length} chars)
                                         </summary>
                                         <div className="mt-1 p-3 bg-blue-50 rounded text-blue-700">
                                           <div className="space-y-2">
                                             <div className="text-xs text-blue-600 mb-2">Decision rationale:</div>
                                             <div className="bg-white p-2 rounded border text-sm leading-relaxed">
-                                              {stepData.selection_reasoning}
+                                              {data.selection_reasoning}
                                             </div>
                                           </div>
                                         </div>
                                       </details>
                                     )}
 
-                                    {stepData.action_parameters && (
+                                    {data.action_parameters && (
                                       <details className="text-xs mb-2">
                                         <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 font-medium">
-                                          Action Parameters ({stepData.action_parameters.length} chars)
+                                          Action Parameters ({data.action_parameters.length} chars)
                                         </summary>
                                         <div className="mt-1 p-2 bg-indigo-50 rounded text-indigo-700">
                                           <div className="space-y-2">
                                             <div className="text-xs text-indigo-600 mb-2">Parameters preview:</div>
                                             <div className="max-h-24 overflow-y-auto bg-white p-2 rounded border text-xs break-words font-mono">
-                                              {stepData.action_parameters.substring(0, 200)}
-                                              {stepData.action_parameters.length > 200 && '...'}
+                                              {data.action_parameters.substring(0, 200)}
+                                              {data.action_parameters.length > 200 && '...'}
                                             </div>
-                                            {stepData.action_parameters.length > 200 && (
+                                            {data.action_parameters.length > 200 && (
                                               <details className="mt-2">
                                                 <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 text-xs">
-                                                  View Full Parameters ({stepData.action_parameters.length} chars)
+                                                  View Full Parameters ({data.action_parameters.length} chars)
                                                 </summary>
                                                 <pre className="mt-1 p-2 bg-white rounded border max-h-64 overflow-auto text-xs whitespace-pre-wrap break-words">
-                                                  {stepData.action_parameters}
+                                                  {data.action_parameters}
                                                 </pre>
                                               </details>
                                             )}
@@ -1480,26 +1467,26 @@ export default function InteractPage() {
                                     )}
 
                                     {/* Show other interesting fields if they exist */}
-                                    {(stepData.context_size || stepData.thoughts_processed || stepData.round_status) && (
+                                    {(data.context_size || data.thoughts_processed || data.round_status) && (
                                       <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                                        {stepData.context_size && (
+                                        {data.context_size && (
                                           <span className="bg-gray-100 px-2 py-1 rounded">
-                                            Context: {stepData.context_size} chars
+                                            Context: {data.context_size} chars
                                           </span>
                                         )}
-                                        {stepData.thoughts_processed && (
+                                        {data.thoughts_processed && (
                                           <span className="bg-gray-100 px-2 py-1 rounded">
-                                            Thoughts: {stepData.thoughts_processed}
+                                            Thoughts: {data.thoughts_processed}
                                           </span>
                                         )}
-                                        {stepData.round_status && (
+                                        {data.round_status && (
                                           <span className="bg-gray-100 px-2 py-1 rounded">
-                                            Round: {stepData.round_status}
+                                            Round: {data.round_status}
                                           </span>
                                         )}
-                                        {stepData.conscience_passed !== undefined && (
-                                          <span className={`px-2 py-1 rounded ${stepData.conscience_passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            Conscience: {stepData.conscience_passed ? 'Passed' : 'Failed'}
+                                        {data.conscience_passed !== undefined && (
+                                          <span className={`px-2 py-1 rounded ${data.conscience_passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            Conscience: {data.conscience_passed ? 'Passed' : 'Failed'}
                                           </span>
                                         )}
                                       </div>
@@ -1511,7 +1498,7 @@ export default function InteractPage() {
                                         Raw Step Data
                                       </summary>
                                       <pre className="mt-1 p-2 bg-gray-50 rounded overflow-x-auto text-xs whitespace-pre-wrap break-words">
-                                        {JSON.stringify(stepData, null, 2)}
+                                        {JSON.stringify(data, null, 2)}
                                       </pre>
                                     </details>
                                   </div>
