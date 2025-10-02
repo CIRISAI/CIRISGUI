@@ -936,50 +936,49 @@ export default function InteractPage() {
         {currentAgent && (
           <div className="mt-6 bg-white shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center space-x-3">
-                  <h3 className="text-lg font-medium text-gray-900">CIRIS Reasoning Process</h3>
-                  {/* Clear Visual Indicator */}
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-full px-3 py-1">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs font-medium text-green-800">Task Flow Active</span>
-                    </div>
+              {/* Active Tasks Row - Below text entry */}
+              {activeTasks.size > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-center space-x-3 mb-4">
+                    {Array.from(activeTasks.entries())
+                      .filter(([taskId, task]) => !task.completed)
+                      .map(([taskId, task]) => {
+                        const isCompleting = completingTasks.has(taskId);
+                        const shortDesc = task.description?.substring(0, 20) || '';
+                        const last4 = taskId.slice(-4);
+                        const displayText = shortDesc ? `${shortDesc}:${last4}` : taskId.split('-').pop()?.substring(0, 6) || taskId.substring(0, 6);
+                        return (
+                          <div key={taskId} className="flex flex-col items-center">
+                            <div
+                              className={`px-3 py-2 rounded-lg text-sm font-medium text-white ${task.color} ${
+                                isCompleting ? 'task-completing' : 'shadow-md'
+                              }`}
+                              title={task.description || `Task ${taskId} - ${task.thoughts.size} thoughts`}
+                            >
+                              {displayText}
+                            </div>
+                            {/* Thought beams container */}
+                            <div className="flex space-x-0.5 mt-2">
+                              {Array.from(task.thoughts.entries()).map(([thoughtId, thought], thoughtIndex) => {
+                                const totalThoughts = task.thoughts.size;
+                                const beamWidth = totalThoughts === 1 ? 'w-8' : totalThoughts === 2 ? 'w-4' : totalThoughts === 3 ? 'w-3' : 'w-2';
+                                const isLatest = thoughtIndex === totalThoughts - 1;
+                                return (
+                                  <div
+                                    key={thoughtId}
+                                    className={`${beamWidth} h-4 ${task.color} rounded-t transition-all duration-500 ${
+                                      isLatest ? 'opacity-100' : 'opacity-40 scale-90'
+                                    }`}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
-
-                {/* Active Tasks Display - Top Right */}
-                {activeTasks.size > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600">Active Tasks:</span>
-                    {Array.from(activeTasks.entries())
-                      .filter(([taskId, task]) => !task.completed) // Only show active (non-completed) tasks
-                      .map(([taskId, task]) => {
-                      const isCompleting = completingTasks.has(taskId);
-                      // Extract first 20 chars of description and last 4 chars of task ID
-                      const shortDesc = task.description?.substring(0, 20) || '';
-                      const last4 = taskId.slice(-4);
-                      const displayText = shortDesc ? `${shortDesc}:${last4}` : taskId.split('-').pop()?.substring(0, 6) || taskId.substring(0, 6);
-                      return (
-                        <div
-                          key={taskId}
-                          className={`px-3 py-1 rounded text-xs font-medium text-white ${task.color} ${
-                            isCompleting
-                              ? 'task-completing'
-                              : task.completed
-                                ? 'opacity-50'
-                                : 'animate-pulse'
-                          }`}
-                          title={task.description || `Task ${taskId} - ${task.thoughts.size} thoughts${isCompleting ? ' (Completing!)' : ''}`}
-                        >
-                          {displayText}
-                          {isCompleting && <span className="ml-1">→</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Debug Info */}
               <div className="text-xs text-gray-500 mb-4">
@@ -987,9 +986,45 @@ export default function InteractPage() {
                 Task Colors: {Array.from(activeTasks.values()).map(t => t.color).join(', ')}
               </div>
 
-              {/* Reasoning Lanes - Interactive H3ERE Flow */}
+              {/* Reasoning Lanes - Vertical Beam Flow */}
               <div className="mb-6">
-                <div className="space-y-3">
+                {/* Task beams flowing through steps */}
+                <div className="flex justify-center space-x-8">
+                  {Array.from(activeTasks.entries())
+                    .filter(([taskId, task]) => !task.completed)
+                    .map(([taskId, task]) => (
+                      <div key={taskId} className="flex flex-col items-center space-y-2">
+                        {/* Thought beams through each step */}
+                        {['SNAPSHOT_AND_CONTEXT', 'DMA_RESULTS', 'ASPDMA_RESULT', 'CONSCIENCE_RESULT', 'ACTION_RESULT'].map((stepName) => (
+                          <div key={stepName} className="flex space-x-0.5">
+                            {Array.from(task.thoughts.entries()).map(([thoughtId, thought], thoughtIndex) => {
+                              const totalThoughts = task.thoughts.size;
+                              const beamWidth = totalThoughts === 1 ? 'w-8' : totalThoughts === 2 ? 'w-4' : totalThoughts === 3 ? 'w-3' : 'w-2';
+                              const isLatest = thoughtIndex === totalThoughts - 1;
+                              const hasReached = thought.stepsReached.has(stepName);
+                              const isCurrent = thought.currentStep && thought.currentStep.toLowerCase().includes(stepName.toLowerCase());
+
+                              return (
+                                <div
+                                  key={thoughtId}
+                                  className={`${beamWidth} h-16 ${task.color} transition-all duration-500 ${
+                                    hasReached
+                                      ? isCurrent
+                                        ? 'opacity-100 animate-pulse'
+                                        : 'opacity-60'
+                                      : 'opacity-10'
+                                  } ${isLatest ? 'scale-100' : 'scale-90 opacity-40'}`}
+                                  title={`${stepName} - Thought ${thoughtId.substring(0, 8)}`}
+                                />
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                </div>
+
+                <div className="space-y-3 mt-6">
                   {/* Lane 1: SNAPSHOT_AND_CONTEXT */}
                   <div className={`flex items-center p-4 rounded-lg border-2 transition-all duration-300 ${
                     activeStep === 'SNAPSHOT_AND_CONTEXT'
