@@ -414,6 +414,11 @@ export default function InteractPage() {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    // Reconnection state
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+    let reconnectTimeoutId: NodeJS.Timeout | null = null;
+
     // Use fetch with proper headers instead of EventSource
     const connectStream = async () => {
       try {
@@ -433,6 +438,7 @@ export default function InteractPage() {
         console.log('✅ Stream response received');
         setStreamConnected(true);
         setStreamError(null);
+        reconnectAttempts = 0; // Reset on successful connection
 
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
@@ -450,10 +456,16 @@ export default function InteractPage() {
           const { done, value } = await reader.read();
 
           if (done) {
-            console.log('Stream ended');
+            console.log('Stream ended - attempting reconnect');
             // Process any remaining buffered event
             if (eventType && eventData) {
               processSSEEvent(eventType, eventData);
+            }
+
+            // Stream ended, trigger reconnection
+            setStreamConnected(false);
+            if (!abortController.signal.aborted) {
+              scheduleReconnect();
             }
             break;
           }
@@ -493,8 +505,31 @@ export default function InteractPage() {
           console.error('❌ Stream connection error:', error);
           setStreamError(`Connection failed: ${error.message}`);
           setStreamConnected(false);
+
+          // Schedule reconnection
+          if (!abortController.signal.aborted) {
+            scheduleReconnect();
+          }
         }
       }
+    };
+
+    // Schedule reconnection with exponential backoff
+    const scheduleReconnect = () => {
+      if (reconnectAttempts >= maxReconnectAttempts) {
+        console.error('❌ Max reconnection attempts reached');
+        setStreamError('Connection lost - max reconnection attempts reached');
+        return;
+      }
+
+      reconnectAttempts++;
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000); // Max 30s
+      console.log(`🔄 Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+
+      reconnectTimeoutId = setTimeout(() => {
+        console.log('🔄 Attempting to reconnect...');
+        connectStream();
+      }, delay);
     };
 
     // Function to process SSE events
@@ -686,6 +721,11 @@ export default function InteractPage() {
       console.log('🔌 Closing stream connection');
       abortController.abort();
       abortControllerRef.current = null;
+
+      // Clear reconnection timeout if exists
+      if (reconnectTimeoutId) {
+        clearTimeout(reconnectTimeoutId);
+      }
     };
   }, [currentAgent]);
 
