@@ -17,8 +17,14 @@ function OAuthCallbackContent() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      // Ensure SDK has a base URL configured
-      const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
+      // Configure SDK with agent-specific base URL for managed mode
+      // In managed mode: /api/{agent_id}/v1/...
+      // In standalone mode: use env variable or origin
+      const isManaged = window.location.hostname === 'agents.ciris.ai' || window.location.pathname.startsWith('/api/');
+      const baseURL = isManaged
+        ? `${window.location.origin}/api/${agentId}`
+        : (process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin);
+
       cirisClient.setConfig({ baseURL });
 
       // Handle the OAuth token response from API
