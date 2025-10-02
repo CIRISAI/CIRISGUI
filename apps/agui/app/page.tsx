@@ -1050,8 +1050,9 @@ export default function InteractPage() {
                               }
                             });
 
-                            // Height grows as we progress through steps (h-16 per step + h-2 gap)
-                            const beamHeight = maxStepReached >= 0 ? `${(maxStepReached + 1) * 18}` : '0';
+                            // Height grows as we progress through steps
+                            // Each lane is ~5.5rem (p-4 + content) + 0.75rem gap (space-y-3)
+                            const beamHeight = maxStepReached >= 0 ? `${(maxStepReached + 1) * 6.25}` : '0';
 
                             return (
                               <div
