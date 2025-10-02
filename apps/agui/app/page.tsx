@@ -993,33 +993,38 @@ export default function InteractPage() {
                   {Array.from(activeTasks.entries())
                     .filter(([taskId, task]) => !task.completed)
                     .map(([taskId, task]) => (
-                      <div key={taskId} className="flex flex-col items-center space-y-2">
-                        {/* Thought beams through each step */}
-                        {['SNAPSHOT_AND_CONTEXT', 'DMA_RESULTS', 'ASPDMA_RESULT', 'CONSCIENCE_RESULT', 'ACTION_RESULT'].map((stepName) => (
-                          <div key={stepName} className="flex space-x-0.5">
-                            {Array.from(task.thoughts.entries()).map(([thoughtId, thought], thoughtIndex) => {
-                              const totalThoughts = task.thoughts.size;
-                              const beamWidth = totalThoughts === 1 ? 'w-8' : totalThoughts === 2 ? 'w-4' : totalThoughts === 3 ? 'w-3' : 'w-2';
-                              const isLatest = thoughtIndex === totalThoughts - 1;
-                              const hasReached = thought.stepsReached.has(stepName);
-                              const isCurrent = thought.currentStep && thought.currentStep.toLowerCase().includes(stepName.toLowerCase());
+                      <div key={taskId} className="flex flex-col items-center">
+                        {/* Continuous vertical beam for each thought */}
+                        <div className="flex space-x-0.5">
+                          {Array.from(task.thoughts.entries()).map(([thoughtId, thought], thoughtIndex) => {
+                            const totalThoughts = task.thoughts.size;
+                            const beamWidth = totalThoughts === 1 ? 'w-8' : totalThoughts === 2 ? 'w-4' : totalThoughts === 3 ? 'w-3' : 'w-2';
+                            const isLatest = thoughtIndex === totalThoughts - 1;
 
-                              return (
-                                <div
-                                  key={thoughtId}
-                                  className={`${beamWidth} h-16 ${task.color} transition-all duration-500 ${
-                                    hasReached
-                                      ? isCurrent
-                                        ? 'opacity-100 animate-pulse'
-                                        : 'opacity-60'
-                                      : 'opacity-10'
-                                  } ${isLatest ? 'scale-100' : 'scale-90 opacity-40'}`}
-                                  title={`${stepName} - Thought ${thoughtId.substring(0, 8)}`}
-                                />
-                              );
-                            })}
-                          </div>
-                        ))}
+                            // Calculate how far the beam should extend based on steps reached
+                            const stepNames = ['SNAPSHOT_AND_CONTEXT', 'DMA_RESULTS', 'ASPDMA_RESULT', 'CONSCIENCE_RESULT', 'ACTION_RESULT'];
+                            let maxStepReached = -1;
+                            stepNames.forEach((step, idx) => {
+                              if (thought.stepsReached.has(step)) {
+                                maxStepReached = idx;
+                              }
+                            });
+
+                            // Height grows as we progress through steps (h-16 per step + h-2 gap)
+                            const beamHeight = maxStepReached >= 0 ? `${(maxStepReached + 1) * 18}` : '0';
+
+                            return (
+                              <div
+                                key={thoughtId}
+                                className={`${beamWidth} ${task.color} transition-all duration-500 rounded-b ${
+                                  isLatest ? 'opacity-90' : 'opacity-30 scale-90'
+                                }`}
+                                style={{ height: `${beamHeight}rem` }}
+                                title={`Thought ${thoughtId.substring(0, 8)} - Step ${maxStepReached + 1}/5`}
+                              />
+                            );
+                          })}
+                        </div>
                       </div>
                     ))}
                 </div>
