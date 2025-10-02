@@ -796,7 +796,7 @@ export default function InteractPage() {
       <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-6 max-w-7xl mx-auto">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 max-w-md">
             Ask {currentAgent?.agent_name || 'Datum'} a question about CIRIS or an ethical dilemma, and see the reasoning below. Note the agent may choose not to answer.
           </p>
         </div>
@@ -921,10 +921,10 @@ export default function InteractPage() {
             {/* Reasoning Visualization - Right Column on Desktop */}
             <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
-              {/* Active Tasks Row - Below text entry */}
+              {/* Active Tasks Row - Right-aligned */}
               {activeTasks.size > 0 && (
                 <div className="mb-6">
-                  <div className="flex items-center justify-center space-x-3 mb-4">
+                  <div className="flex items-center justify-end space-x-3 mb-4">
                     {Array.from(activeTasks.entries())
                       .filter(([taskId, task]) => !task.completed)
                       .slice(-4) // Last 4 tasks (newest)
@@ -1030,9 +1030,9 @@ export default function InteractPage() {
                     }`}>
                       📸
                     </div>
-                    <div className="ml-4 flex-1">
-                      <h4 className="font-medium text-gray-900">SNAPSHOT & CONTEXT</h4>
-                      <p className="text-sm text-gray-600">Gather system state and context</p>
+                    <div className="ml-4 max-w-xs">
+                      <h4 className="font-medium text-gray-900 text-sm">SNAPSHOT & CONTEXT</h4>
+                      <p className="text-xs text-gray-600">Gather system state and context</p>
                     </div>
                   </div>
 
@@ -1049,9 +1049,9 @@ export default function InteractPage() {
                     }`}>
                       🧠
                     </div>
-                    <div className="ml-4 flex-1">
-                      <h4 className="font-medium text-gray-900">DMA ANALYSIS</h4>
-                      <p className="text-sm text-gray-600">Analyze situation with CSDMA, DSDMA, ASPDMA</p>
+                    <div className="ml-4 max-w-xs">
+                      <h4 className="font-medium text-gray-900 text-sm">DMA ANALYSIS</h4>
+                      <p className="text-xs text-gray-600">Analyze situation with CSDMA, DSDMA, ASPDMA</p>
                     </div>
                   </div>
 
@@ -1068,9 +1068,9 @@ export default function InteractPage() {
                     }`}>
                       🎯
                     </div>
-                    <div className="ml-4 flex-1">
-                      <h4 className="font-medium text-gray-900">ACTION SELECTION</h4>
-                      <p className="text-sm text-gray-600">Choose optimal action with rationale</p>
+                    <div className="ml-4 max-w-xs">
+                      <h4 className="font-medium text-gray-900 text-sm">ACTION SELECTION</h4>
+                      <p className="text-xs text-gray-600">Choose optimal action with rationale</p>
                     </div>
                   </div>
 
@@ -1087,9 +1087,9 @@ export default function InteractPage() {
                     }`}>
                       💭
                     </div>
-                    <div className="ml-4 flex-1">
-                      <h4 className="font-medium text-gray-900">CONSCIENCE CHECK</h4>
-                      <p className="text-sm text-gray-600">Ethical evaluation and final decision</p>
+                    <div className="ml-4 max-w-xs">
+                      <h4 className="font-medium text-gray-900 text-sm">CONSCIENCE CHECK</h4>
+                      <p className="text-xs text-gray-600">Ethical evaluation and final decision</p>
                     </div>
                     {/* Conscience Result Indicator */}
                     {conscienceResult && activeStep === 'CONSCIENCE_RESULT' && (
@@ -1116,9 +1116,9 @@ export default function InteractPage() {
                     }`}>
                       ⚡
                     </div>
-                    <div className="ml-4 flex-1">
-                      <h4 className="font-medium text-gray-900">ACTION EXECUTION</h4>
-                      <p className="text-sm text-gray-600">Perform action and generate audit trail</p>
+                    <div className="ml-4 max-w-xs">
+                      <h4 className="font-medium text-gray-900 text-sm">ACTION EXECUTION</h4>
+                      <p className="text-xs text-gray-600">Perform action and generate audit trail</p>
                     </div>
                   </div>
                 </div>
