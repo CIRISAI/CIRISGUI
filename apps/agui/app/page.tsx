@@ -974,10 +974,11 @@ export default function InteractPage() {
 
               {/* Reasoning Lanes - Vertical Beam Flow */}
               <div className="mb-6 relative">
-                {/* Task beams flowing through steps - absolutely positioned overlay */}
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 flex space-x-8 pointer-events-none z-10">
+                {/* Task beams flowing through steps - absolutely positioned overlay on right */}
+                <div className="absolute top-0 right-0 flex space-x-3 pointer-events-none z-10">
                   {Array.from(activeTasks.entries())
                     .filter(([taskId, task]) => !task.completed)
+                    .slice(-4) // Match the top 4 tasks
                     .map(([taskId, task]) => (
                       <div key={taskId} className="flex flex-col items-center">
                         {/* Continuous vertical beam for each thought */}
