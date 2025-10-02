@@ -185,6 +185,11 @@ export default function LoginPage() {
 
   const handleOAuthLogin = async (provider: string) => {
     try {
+      // Clear any leftover OAuth linking state - this is a LOGIN, not a link
+      localStorage.removeItem('oauthIntention');
+      localStorage.removeItem('oauthProvider');
+      localStorage.removeItem('oauthReturnUrl');
+
       const agent = agents.find(a => a.agent_id === selectedAgent);
       if (!agent) return;
 
