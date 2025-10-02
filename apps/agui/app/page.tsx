@@ -982,7 +982,7 @@ export default function InteractPage() {
                   <div className="flex items-center justify-center space-x-3 mb-4">
                     {Array.from(activeTasks.entries())
                       .filter(([taskId, task]) => !task.completed)
-                      .slice(0, 4) // First 4 tasks only
+                      .slice(-4) // Last 4 tasks (newest)
                       .map(([taskId, task]) => {
                         const isCompleting = completingTasks.has(taskId);
                         const shortDesc = task.description?.substring(0, 20) || '';
@@ -1224,14 +1224,14 @@ export default function InteractPage() {
           <>
             {Array.from(activeTasks.entries())
               .filter(([taskId, task]) => !task.completed)
-              .slice(4) // Tasks 5+ (overflow)
+              .slice(0, -4) // Older tasks (not in top 4)
               .length > 0 && (
               <div className="mt-6 bg-white shadow rounded-lg">
                 <div className="px-4 py-3">
                   <div className="flex items-center justify-center space-x-3">
                     {Array.from(activeTasks.entries())
                       .filter(([taskId, task]) => !task.completed)
-                      .slice(4)
+                      .slice(0, -4) // Older tasks
                       .map(([taskId, task]) => {
                         const isCompleting = completingTasks.has(taskId);
                         const shortDesc = task.description?.substring(0, 20) || '';
