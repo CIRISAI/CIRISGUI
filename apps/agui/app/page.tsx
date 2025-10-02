@@ -1173,7 +1173,6 @@ export default function InteractPage() {
                       <h4 className="font-medium text-gray-900">ACTION EXECUTION</h4>
                       <p className="text-sm text-gray-600">Perform action and generate audit trail</p>
                     </div>
-                    </div>
                   </div>
                 </div>
               </div>
