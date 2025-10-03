@@ -290,8 +290,9 @@ export default function InteractPage() {
         </div>
 
         {currentAgent && (
-          <div className="max-w-7xl mx-auto">
-            {/* Unified Timeline */}
+          <>
+            {/* Unified Timeline - Narrower for conversation */}
+            <div className="max-w-4xl mx-auto mb-6">
             <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <div className="border rounded-lg bg-gray-50 h-96 overflow-y-auto p-4 mb-4">
@@ -398,9 +399,12 @@ export default function InteractPage() {
                 </form>
               </div>
             </div>
+            </div>
 
+            {/* Full-width visualizations container */}
+            <div className="max-w-7xl mx-auto space-y-6">
             {/* Pipeline Visualization */}
-            <div className="bg-white shadow rounded-lg mt-6">
+            <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Detailed view of the CIRIS reasoning and machine conscience pipeline</h3>
                 <p className="text-sm text-gray-600 mb-4">
@@ -421,7 +425,7 @@ export default function InteractPage() {
             </div>
 
             {/* Memory Visualization */}
-            <div className="bg-white shadow rounded-lg mt-6">
+            <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Snapshot of the CIRIS Agent Memory</h3>
                 <p className="text-sm text-gray-600 mb-4">
@@ -440,7 +444,8 @@ export default function InteractPage() {
                 </div>
               </div>
             </div>
-          </div>
+            </div>
+          </>
         )}
       </div>
     </ProtectedRoute>
