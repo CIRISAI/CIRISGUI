@@ -366,14 +366,27 @@ export default function InteractPage() {
                                           );
                                         }
 
+                                        // Format timestamp for display
+                                        const timestamp = stage.data.timestamp
+                                          ? new Date(stage.data.timestamp).toLocaleTimeString('en-US', {
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                              second: '2-digit',
+                                              fractionalSecondDigits: 3
+                                            })
+                                          : '';
+
                                         return (
                                           <details key={stageName} className="bg-green-50 border border-green-200 rounded">
                                             <summary className="flex items-center p-2 cursor-pointer hover:bg-green-100 rounded text-xs">
                                               <span className="mr-2">{stageIcons[stageName]}</span>
-                                              <span className="font-medium">
+                                              <span className="font-medium flex-1">
                                                 {stageName.replace(/_/g, ' ').toUpperCase()}
                                               </span>
-                                              <span className="ml-auto text-green-600">✓</span>
+                                              {timestamp && (
+                                                <span className="text-gray-500 text-xs mr-2">{timestamp}</span>
+                                              )}
+                                              <span className="text-green-600">✓</span>
                                             </summary>
                                             <div className="p-2 bg-white border-t border-green-200 text-xs">
                                               <pre className="whitespace-pre-wrap break-words text-xs">
