@@ -938,11 +938,11 @@ export default function InteractPage() {
                         const last4 = taskId.slice(-4);
                         const displayText = shortDesc ? `${shortDesc}:${last4}` : taskId.split('-').pop()?.substring(0, 6) || taskId.substring(0, 6);
                         return (
-                          <div key={taskId} className="flex flex-col items-center">
+                          <div key={taskId} className="flex flex-col items-center w-32">
                             <div
-                              className={`px-3 py-2 rounded-lg text-sm font-medium text-white ${task.color} ${
+                              className={`px-3 py-2 rounded-lg text-xs font-medium text-white ${task.color} ${
                                 isCompleting ? 'task-completing' : 'shadow-md'
-                              }`}
+                              } break-words text-center w-full`}
                               title={task.description || `Task ${taskId} - ${task.thoughts.size} thoughts`}
                             >
                               {displayText}
@@ -984,9 +984,9 @@ export default function InteractPage() {
                     .filter(([taskId, task]) => !task.completed)
                     .slice(-4) // Match the top 4 tasks
                     .map(([taskId, task]) => (
-                      <div key={taskId} className="flex flex-col items-center">
+                      <div key={taskId} className="flex flex-col items-center w-32">
                         {/* Continuous vertical beam for each thought */}
-                        <div className="flex space-x-0.5">
+                        <div className="flex space-x-0.5 justify-center">
                           {Array.from(task.thoughts.entries()).map(([thoughtId, thought], thoughtIndex) => {
                             const totalThoughts = task.thoughts.size;
                             const beamWidth = totalThoughts === 1 ? 'w-8' : totalThoughts === 2 ? 'w-4' : totalThoughts === 3 ? 'w-3' : 'w-2';
