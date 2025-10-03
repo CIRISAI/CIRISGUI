@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAgent } from '@/contexts/AgentContextHybrid';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cirisClient } from '@/lib/ciris-sdk/client';
 import toast from 'react-hot-toast';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -12,7 +12,7 @@ export default function Interact2Page() {
   const { user, hasRole } = useAuth();
   const { currentAgent } = useAgent();
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([]);
+  const queryClient = useQueryClient();
 
   // Task-centric state: Map of taskId -> task data
   const [tasks, setTasks] = useState<Map<string, {
@@ -32,6 +32,28 @@ export default function Interact2Page() {
 
   const taskColors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-red-500', 'bg-pink-500'];
   const taskColorIndex = useRef(0);
+
+  // Fetch conversation history
+  const { data: history, isLoading } = useQuery({
+    queryKey: ['conversation-history'],
+    queryFn: async () => {
+      const result = await cirisClient.agent.getHistory({
+        channel_id: 'api_0.0.0.0_8080',
+        limit: 20
+      });
+      return result;
+    },
+    refetchInterval: 2000,
+    enabled: !!currentAgent,
+  });
+
+  // Get messages and ensure proper order (oldest to newest)
+  const messages = useMemo(() => {
+    if (!history?.messages) return [];
+    return [...history.messages]
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .slice(-20);
+  }, [history]);
 
   // Connect to reasoning stream
   useEffect(() => {
@@ -161,15 +183,18 @@ export default function Interact2Page() {
   const sendMessageMutation = useMutation({
     mutationFn: async (msg: string) => {
       return await cirisClient.agent.interact(msg, {
-        channel_id: 'web_ui',
+        channel_id: 'api_0.0.0.0_8080',
       });
     },
     onSuccess: (data) => {
-      setMessages(prev => [...prev,
-        { role: 'user', content: message },
-        { role: 'assistant', content: data.response || 'Processing...' }
-      ]);
       setMessage('');
+      // Immediately refetch history to show the response
+      queryClient.invalidateQueries({ queryKey: ['conversation-history'] });
+
+      // Show the agent's response in a toast
+      if (data.response) {
+        toast.success(`Agent: ${data.response}`, { duration: 5000 });
+      }
     },
     onError: (error: any) => {
       toast.error(`Error: ${error.message}`);
@@ -208,15 +233,23 @@ export default function Interact2Page() {
             <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <div className="border rounded-lg bg-gray-50 h-96 overflow-y-auto p-4 mb-4">
-                  {messages.map((msg, i) => (
-                    <div key={i} className={`mb-2 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                      <div className={`inline-block px-4 py-2 rounded ${
-                        msg.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'
-                      }`}>
-                        {msg.content}
-                      </div>
+                  {isLoading ? (
+                    <div className="text-center text-gray-500">Loading conversation...</div>
+                  ) : messages.length === 0 ? (
+                    <div className="text-center text-gray-500">No messages yet. Start a conversation!</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {messages.map((msg, i) => (
+                        <div key={msg.id || i} className={`mb-2 ${!msg.is_agent ? 'text-right' : 'text-left'}`}>
+                          <div className={`inline-block px-4 py-2 rounded ${
+                            !msg.is_agent ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                          }`}>
+                            {msg.content}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex gap-2">
