@@ -189,7 +189,6 @@ export default function Interact2Page() {
       });
     },
     onSuccess: (data) => {
-      setMessage('');
       // Immediately refetch history to show the response
       queryClient.invalidateQueries({ queryKey: ['conversation-history'] });
 
@@ -206,7 +205,9 @@ export default function Interact2Page() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
-    sendMessageMutation.mutate(message);
+    const msgToSend = message.trim();
+    setMessage(''); // Clear immediately
+    sendMessageMutation.mutate(msgToSend);
   };
 
   const stageIcons: Record<string, string> = {
