@@ -230,6 +230,24 @@ export default function InteractPage() {
       .catch(err => console.error('Failed to load SVG:', err));
   }, []);
 
+  // Fetch memory visualization
+  const { data: memorySvgContent } = useQuery<string>({
+    queryKey: ['memory-visualization-interact'],
+    queryFn: async () => {
+      return await cirisClient.memory.getVisualization({
+        scope: 'local',
+        layout: 'timeline',
+        hours: 168,
+        width: 1200,
+        height: 600,
+        limit: 1000,
+        include_metrics: false
+      });
+    },
+    enabled: !!currentAgent,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
   // Create unified timeline of messages and tasks
   const timeline = useMemo(() => {
     const items: Array<{
@@ -272,7 +290,7 @@ export default function InteractPage() {
         </div>
 
         {currentAgent && (
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-7xl mx-auto">
             {/* Unified Timeline */}
             <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
@@ -389,12 +407,33 @@ export default function InteractPage() {
                   This diagram shows the complete H3ERE (Holistic Ethical Evaluation and Reasoning Engine) pipeline that processes each thought through multiple stages of analysis, including DMA perspectives, ASPDMA action selection, and conscience evaluation.
                 </p>
                 <div className="w-full overflow-x-auto">
-                  <div className="min-w-[1200px] bg-gray-50 rounded-lg p-4">
+                  <div className="w-full bg-gray-50 rounded-lg p-4">
                     {svgContent ? (
                       <div dangerouslySetInnerHTML={{ __html: svgContent }} />
                     ) : (
                       <div className="flex items-center justify-center h-[150px] text-gray-500">
                         Loading pipeline visualization...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Memory Visualization */}
+            <div className="bg-white shadow rounded-lg mt-6">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Snapshot of the CIRIS Agent Memory</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Real-time view of the agent's memory graph showing concepts, observations, and relationships formed over the past week. Hover over nodes to see details.
+                </p>
+                <div className="w-full overflow-x-auto">
+                  <div className="w-full bg-gray-50 rounded-lg p-4">
+                    {memorySvgContent ? (
+                      <div dangerouslySetInnerHTML={{ __html: memorySvgContent }} />
+                    ) : (
+                      <div className="flex items-center justify-center h-[150px] text-gray-500">
+                        Loading memory visualization...
                       </div>
                     )}
                   </div>
