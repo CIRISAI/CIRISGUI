@@ -13,6 +13,7 @@ export default function InteractPage() {
   const { currentAgent } = useAgent();
   const [message, setMessage] = useState('');
   const queryClient = useQueryClient();
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
 
   // Task-centric state: Map of taskId -> task data
   const [tasks, setTasks] = useState<Map<string, {
@@ -280,6 +281,13 @@ export default function InteractPage() {
     );
   }, [messages, tasks]);
 
+  // Auto-scroll to bottom when timeline changes
+  useEffect(() => {
+    if (timelineContainerRef.current) {
+      timelineContainerRef.current.scrollTop = timelineContainerRef.current.scrollHeight;
+    }
+  }, [timeline]);
+
   return (
     <ProtectedRoute>
       <style jsx global>{`
@@ -301,7 +309,7 @@ export default function InteractPage() {
             <div className="max-w-4xl mx-auto mb-6">
             <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
-                <div className="border rounded-lg bg-gray-50 h-96 overflow-y-auto p-4 mb-4">
+                <div ref={timelineContainerRef} className="border rounded-lg bg-gray-50 h-96 overflow-y-auto p-4 mb-4">
                   {isLoading ? (
                     <div className="text-center text-gray-500">Loading conversation...</div>
                   ) : timeline.length === 0 ? (
