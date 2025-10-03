@@ -32,8 +32,7 @@ function Navbar({ className }: { className?: string }) {
   }, [user, hasRole]);
 
   const navigation = [
-    { name: "Interact", href: "/", minRole: "OBSERVER" },
-    { name: "Interact2", href: "/interact2", minRole: "OBSERVER" }
+    { name: "Interact", href: "/", minRole: "OBSERVER" }
   ];
   const systemNavigation = [
     { name: "Memory Graph", href: "/memory", minRole: "OBSERVER" },
