@@ -20,6 +20,7 @@ export default function Interact2Page() {
     description: string;
     color: string;
     completed: boolean;
+    firstTimestamp: string; // Timestamp of first event for sorting
     thoughts: Array<{
       thoughtId: string;
       stages: Map<string, {
@@ -139,6 +140,7 @@ export default function Interact2Page() {
                   description: event.task_description || '',
                   color: taskColors[taskColorIndex.current % taskColors.length],
                   completed: false,
+                  firstTimestamp: event.timestamp || new Date().toISOString(),
                   thoughts: []
                 };
                 taskColorIndex.current++;
@@ -218,6 +220,38 @@ export default function Interact2Page() {
 
   const stageNames = ['thought_start', 'snapshot_and_context', 'dma_results', 'aspdma_result', 'conscience_result', 'action_result'];
 
+  // Create unified timeline of messages and tasks
+  const timeline = useMemo(() => {
+    const items: Array<{
+      type: 'message' | 'task';
+      timestamp: string;
+      data: any;
+    }> = [];
+
+    // Add messages
+    messages.forEach(msg => {
+      items.push({
+        type: 'message',
+        timestamp: msg.timestamp,
+        data: msg
+      });
+    });
+
+    // Add tasks
+    Array.from(tasks.values()).forEach(task => {
+      items.push({
+        type: 'task',
+        timestamp: task.firstTimestamp,
+        data: task
+      });
+    });
+
+    // Sort by timestamp
+    return items.sort((a, b) =>
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+  }, [messages, tasks]);
+
   return (
     <ProtectedRoute>
       <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -228,26 +262,76 @@ export default function Interact2Page() {
         </div>
 
         {currentAgent && (
-          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Chat Interface - Left Column */}
+          <div className="max-w-4xl mx-auto">
+            {/* Unified Timeline */}
             <div className="bg-white shadow rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <div className="border rounded-lg bg-gray-50 h-96 overflow-y-auto p-4 mb-4">
                   {isLoading ? (
                     <div className="text-center text-gray-500">Loading conversation...</div>
-                  ) : messages.length === 0 ? (
+                  ) : timeline.length === 0 ? (
                     <div className="text-center text-gray-500">No messages yet. Start a conversation!</div>
                   ) : (
                     <div className="space-y-3">
-                      {messages.map((msg, i) => (
-                        <div key={msg.id || i} className={`mb-2 ${!msg.is_agent ? 'text-right' : 'text-left'}`}>
-                          <div className={`inline-block px-4 py-2 rounded ${
-                            !msg.is_agent ? 'bg-blue-500 text-white' : 'bg-gray-200'
-                          }`}>
-                            {msg.content}
-                          </div>
-                        </div>
-                      ))}
+                      {timeline.map((item, i) => {
+                        if (item.type === 'message') {
+                          const msg = item.data;
+                          return (
+                            <div key={`msg-${msg.id || i}`} className={`mb-2 ${!msg.is_agent ? 'text-right' : 'text-left'}`}>
+                              <div className={`inline-block px-4 py-2 rounded ${
+                                !msg.is_agent ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                              }`}>
+                                {msg.content}
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          // Task item
+                          const task = item.data;
+                          return (
+                            <details key={`task-${task.taskId}`} className="border rounded-lg">
+                              <summary className={`cursor-pointer p-3 ${task.color} text-white rounded-t-lg ${task.completed ? 'opacity-60' : ''}`}>
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">{task.description || task.taskId.slice(-8)}</span>
+                                  <span className="text-xs">{task.thoughts.length} thought(s)</span>
+                                </div>
+                              </summary>
+                              <div className="p-3 space-y-2 bg-gray-50">
+                                {task.thoughts.map((thought: any) => (
+                                  <details key={thought.thoughtId} className="border border-gray-200 rounded">
+                                    <summary className="cursor-pointer p-2 bg-white hover:bg-gray-50">
+                                      <span className="text-sm font-medium">Thought {thought.thoughtId.slice(-8)}</span>
+                                      <span className="text-xs text-gray-500 ml-2">
+                                        ({thought.stages.size}/6 stages)
+                                      </span>
+                                    </summary>
+                                    <div className="p-2 bg-gray-100 space-y-1">
+                                      {/* H3ERE Stages */}
+                                      {stageNames.map(stageName => {
+                                        const stage = thought.stages.get(stageName);
+                                        return (
+                                          <div
+                                            key={stageName}
+                                            className={`flex items-center p-2 rounded text-xs ${
+                                              stage ? 'bg-green-50 border border-green-200' : 'bg-gray-200'
+                                            }`}
+                                          >
+                                            <span className="mr-2">{stageIcons[stageName]}</span>
+                                            <span className={stage ? 'font-medium' : 'text-gray-500'}>
+                                              {stageName.replace(/_/g, ' ').toUpperCase()}
+                                            </span>
+                                            {stage && <span className="ml-auto text-green-600">✓</span>}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </details>
+                                ))}
+                              </div>
+                            </details>
+                          );
+                        }
+                      })}
                     </div>
                   )}
                 </div>
@@ -268,57 +352,6 @@ export default function Interact2Page() {
                     Send
                   </button>
                 </form>
-              </div>
-            </div>
-
-            {/* Task List - Right Column */}
-            <div className="bg-white shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg font-medium mb-4">Active Tasks</h3>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {Array.from(tasks.values()).map(task => (
-                    <details key={task.taskId} className="border rounded-lg">
-                      <summary className={`cursor-pointer p-3 ${task.color} text-white rounded-t-lg ${task.completed ? 'opacity-60' : ''}`}>
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">{task.description || task.taskId.slice(-8)}</span>
-                          <span className="text-xs">{task.thoughts.length} thought(s)</span>
-                        </div>
-                      </summary>
-                      <div className="p-3 space-y-2 bg-gray-50">
-                        {task.thoughts.map(thought => (
-                          <details key={thought.thoughtId} className="border border-gray-200 rounded">
-                            <summary className="cursor-pointer p-2 bg-white hover:bg-gray-50">
-                              <span className="text-sm font-medium">Thought {thought.thoughtId.slice(-8)}</span>
-                              <span className="text-xs text-gray-500 ml-2">
-                                ({thought.stages.size}/6 stages)
-                              </span>
-                            </summary>
-                            <div className="p-2 bg-gray-100 space-y-1">
-                              {/* H3ERE Stages */}
-                              {stageNames.map(stageName => {
-                                const stage = thought.stages.get(stageName);
-                                return (
-                                  <div
-                                    key={stageName}
-                                    className={`flex items-center p-2 rounded text-xs ${
-                                      stage ? 'bg-green-50 border border-green-200' : 'bg-gray-200'
-                                    }`}
-                                  >
-                                    <span className="mr-2">{stageIcons[stageName]}</span>
-                                    <span className={stage ? 'font-medium' : 'text-gray-500'}>
-                                      {stageName.replace(/_/g, ' ').toUpperCase()}
-                                    </span>
-                                    {stage && <span className="ml-auto text-green-600">✓</span>}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </details>
-                        ))}
-                      </div>
-                    </details>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
