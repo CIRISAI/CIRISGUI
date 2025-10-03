@@ -282,6 +282,12 @@ export default function InteractPage() {
 
   return (
     <ProtectedRoute>
+      <style jsx global>{`
+        svg {
+          max-width: 100%;
+          height: auto;
+        }
+      `}</style>
       <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6 max-w-7xl mx-auto">
           <p className="text-sm text-gray-600 max-w-3xl">
@@ -408,18 +414,18 @@ export default function InteractPage() {
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Detailed view of the CIRIS reasoning and machine conscience pipeline</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  This diagram shows the complete H3ERE (Holistic Ethical Evaluation and Reasoning Engine) pipeline that processes each thought through multiple stages of analysis, including DMA perspectives, ASPDMA action selection, and conscience evaluation.
+                  This diagram shows the complete CIRIS Agent pipeline that processes each thought through context gathering and then multiple stages of analysis, including what COULD and SHOULD be done from 3 different perspectives simultaneously, principled action selection from 10 verbs, and conscience evaluation of whether this action aligns with CIRIS principles and the agents own identity and past actions.
                 </p>
-                <div className="w-full overflow-x-auto">
-                  <div className="w-full bg-gray-50 rounded-lg p-4">
-                    {svgContent ? (
-                      <div dangerouslySetInnerHTML={{ __html: svgContent }} />
-                    ) : (
-                      <div className="flex items-center justify-center h-[150px] text-gray-500">
-                        Loading pipeline visualization...
-                      </div>
-                    )}
-                  </div>
+                <div className="w-full bg-gray-50 rounded-lg p-4">
+                  {svgContent ? (
+                    <div className="w-full" style={{ maxWidth: '100%', overflow: 'visible' }}>
+                      <div dangerouslySetInnerHTML={{ __html: svgContent }} style={{ width: '100%', height: 'auto' }} />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-[150px] text-gray-500">
+                      Loading pipeline visualization...
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -431,16 +437,16 @@ export default function InteractPage() {
                 <p className="text-sm text-gray-600 mb-4">
                   Real-time view of the agent's memory graph showing concepts, observations, and relationships formed over the past week. Hover over nodes to see details.
                 </p>
-                <div className="w-full overflow-x-auto">
-                  <div className="w-full bg-gray-50 rounded-lg p-4">
-                    {memorySvgContent ? (
-                      <div dangerouslySetInnerHTML={{ __html: memorySvgContent }} />
-                    ) : (
-                      <div className="flex items-center justify-center h-[150px] text-gray-500">
-                        Loading memory visualization...
-                      </div>
-                    )}
-                  </div>
+                <div className="w-full bg-gray-50 rounded-lg p-4">
+                  {memorySvgContent ? (
+                    <div className="w-full" style={{ maxWidth: '100%', overflow: 'visible' }}>
+                      <div dangerouslySetInnerHTML={{ __html: memorySvgContent }} style={{ width: '100%', height: 'auto' }} />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-[150px] text-gray-500">
+                      Loading memory visualization...
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
