@@ -221,6 +221,15 @@ export default function InteractPage() {
 
   const stageNames = ['thought_start', 'snapshot_and_context', 'dma_results', 'aspdma_result', 'conscience_result', 'action_result'];
 
+  // Load SVG pipeline visualization
+  const [svgContent, setSvgContent] = useState<string>('');
+  useEffect(() => {
+    fetch('/pipeline-visualization.svg')
+      .then(res => res.text())
+      .then(svg => setSvgContent(svg))
+      .catch(err => console.error('Failed to load SVG:', err));
+  }, []);
+
   // Create unified timeline of messages and tasks
   const timeline = useMemo(() => {
     const items: Array<{
@@ -369,6 +378,27 @@ export default function InteractPage() {
                     Send
                   </button>
                 </form>
+              </div>
+            </div>
+
+            {/* Pipeline Visualization */}
+            <div className="bg-white shadow rounded-lg mt-6">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Detailed view of the CIRIS reasoning and machine conscience pipeline</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  This diagram shows the complete H3ERE (Holistic Ethical Evaluation and Reasoning Engine) pipeline that processes each thought through multiple stages of analysis, including DMA perspectives, ASPDMA action selection, and conscience evaluation.
+                </p>
+                <div className="w-full overflow-x-auto">
+                  <div className="min-w-[1200px] bg-gray-50 rounded-lg p-4">
+                    {svgContent ? (
+                      <div dangerouslySetInnerHTML={{ __html: svgContent }} />
+                    ) : (
+                      <div className="flex items-center justify-center h-[150px] text-gray-500">
+                        Loading pipeline visualization...
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
