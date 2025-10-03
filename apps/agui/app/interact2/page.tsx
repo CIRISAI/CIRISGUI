@@ -309,19 +309,35 @@ export default function Interact2Page() {
                                       {/* H3ERE Stages */}
                                       {stageNames.map(stageName => {
                                         const stage = thought.stages.get(stageName);
+                                        if (!stage) {
+                                          return (
+                                            <div
+                                              key={stageName}
+                                              className="flex items-center p-2 rounded text-xs bg-gray-200"
+                                            >
+                                              <span className="mr-2">{stageIcons[stageName]}</span>
+                                              <span className="text-gray-500">
+                                                {stageName.replace(/_/g, ' ').toUpperCase()}
+                                              </span>
+                                            </div>
+                                          );
+                                        }
+
                                         return (
-                                          <div
-                                            key={stageName}
-                                            className={`flex items-center p-2 rounded text-xs ${
-                                              stage ? 'bg-green-50 border border-green-200' : 'bg-gray-200'
-                                            }`}
-                                          >
-                                            <span className="mr-2">{stageIcons[stageName]}</span>
-                                            <span className={stage ? 'font-medium' : 'text-gray-500'}>
-                                              {stageName.replace(/_/g, ' ').toUpperCase()}
-                                            </span>
-                                            {stage && <span className="ml-auto text-green-600">✓</span>}
-                                          </div>
+                                          <details key={stageName} className="bg-green-50 border border-green-200 rounded">
+                                            <summary className="flex items-center p-2 cursor-pointer hover:bg-green-100 rounded text-xs">
+                                              <span className="mr-2">{stageIcons[stageName]}</span>
+                                              <span className="font-medium">
+                                                {stageName.replace(/_/g, ' ').toUpperCase()}
+                                              </span>
+                                              <span className="ml-auto text-green-600">✓</span>
+                                            </summary>
+                                            <div className="p-2 bg-white border-t border-green-200 text-xs">
+                                              <pre className="whitespace-pre-wrap break-words text-xs">
+                                                {JSON.stringify(stage.data, null, 2)}
+                                              </pre>
+                                            </div>
+                                          </details>
                                         );
                                       })}
                                     </div>
