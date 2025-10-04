@@ -15,6 +15,9 @@ export default function InteractPage() {
   const queryClient = useQueryClient();
   const timelineContainerRef = useRef<HTMLDivElement>(null);
 
+  // Track which task_ids belong to messages we sent
+  const [ourTaskIds, setOurTaskIds] = useState<Set<string>>(new Set());
+
   // Task-centric state: Map of taskId -> task data
   const [tasks, setTasks] = useState<Map<string, {
     taskId: string;
@@ -22,6 +25,7 @@ export default function InteractPage() {
     color: string;
     completed: boolean;
     firstTimestamp: string; // Timestamp of first event for sorting
+    isOurs: boolean; // Is this task from a message we sent?
     thoughts: Array<{
       thoughtId: string;
       stages: Map<string, {
@@ -142,6 +146,7 @@ export default function InteractPage() {
                   color: taskColors[taskColorIndex.current % taskColors.length],
                   completed: false,
                   firstTimestamp: event.timestamp || new Date().toISOString(),
+                  isOurs: ourTaskIds.has(task_id),
                   thoughts: []
                 };
                 taskColorIndex.current++;
@@ -190,8 +195,19 @@ export default function InteractPage() {
       });
     },
     onSuccess: (data) => {
-      // Message submitted for async processing
-      toast.success(`Message submitted (${data.thought_id.slice(-8)})`, { duration: 2000 });
+      if (data.accepted && data.task_id) {
+        // Track this task_id as ours
+        setOurTaskIds(prev => new Set(prev).add(data.task_id!));
+
+        // Message submitted for async processing
+        toast.success(`Message accepted (task: ${data.task_id.slice(-8)})`, { duration: 2000 });
+      } else {
+        // Message was rejected
+        toast.error(`Message rejected: ${data.rejection_reason}`, { duration: 4000 });
+        if (data.rejection_detail) {
+          console.error('Rejection detail:', data.rejection_detail);
+        }
+      }
 
       // Refetch history after a short delay to show user message
       setTimeout(() => {
@@ -255,24 +271,34 @@ export default function InteractPage() {
       type: 'message' | 'task';
       timestamp: string;
       data: any;
+      relatedTask?: any; // For messages, include their related task if it's ours
     }> = [];
 
-    // Add messages
+    // Add messages with their related tasks
     messages.forEach(msg => {
+      // Find if there's a task that belongs to this message
+      // Tasks are correlated by being sent shortly after the message
+      const relatedTask = !msg.is_agent
+        ? Array.from(tasks.values()).find(task => task.isOurs && !items.some(item => item.relatedTask?.taskId === task.taskId))
+        : undefined;
+
       items.push({
         type: 'message',
         timestamp: msg.timestamp,
-        data: msg
+        data: msg,
+        relatedTask
       });
     });
 
-    // Add tasks
+    // Add tasks that are NOT ours (admin tasks, system tasks, etc)
     Array.from(tasks.values()).forEach(task => {
-      items.push({
-        type: 'task',
-        timestamp: task.firstTimestamp,
-        data: task
-      });
+      if (!task.isOurs) {
+        items.push({
+          type: 'task',
+          timestamp: task.firstTimestamp,
+          data: task
+        });
+      }
     });
 
     // Sort by timestamp
@@ -319,13 +345,91 @@ export default function InteractPage() {
                       {timeline.map((item, i) => {
                         if (item.type === 'message') {
                           const msg = item.data;
+                          const task = item.relatedTask;
+
                           return (
-                            <div key={`msg-${msg.id || i}`} className={`mb-2 ${!msg.is_agent ? 'text-right' : 'text-left'}`}>
-                              <div className={`inline-block px-4 py-2 rounded ${
-                                !msg.is_agent ? 'bg-blue-500 text-white' : 'bg-gray-200'
-                              }`}>
-                                {msg.content}
+                            <div key={`msg-${msg.id || i}`} className="mb-3">
+                              <div className={`${!msg.is_agent ? 'text-right' : 'text-left'}`}>
+                                <div className={`inline-block px-4 py-2 rounded ${
+                                  !msg.is_agent ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                                }`}>
+                                  {msg.content}
+                                </div>
                               </div>
+
+                              {/* Show related task if it exists */}
+                              {task && !msg.is_agent && (
+                                <div className="mt-2 ml-4">
+                                  <details className="border rounded-lg">
+                                    <summary className={`cursor-pointer p-3 ${task.color} text-white rounded-t-lg ${task.completed ? 'opacity-60' : ''}`}>
+                                      <div className="flex justify-between items-center">
+                                        <span className="font-medium text-sm">🧠 {task.description || task.taskId.slice(-8)}</span>
+                                        <span className="text-xs">{task.thoughts.length} thought(s)</span>
+                                      </div>
+                                    </summary>
+                                    <div className="p-3 space-y-2 bg-gray-50">
+                                      {task.thoughts.map((thought: any) => (
+                                        <details key={thought.thoughtId} className="border border-gray-200 rounded">
+                                          <summary className="cursor-pointer p-2 bg-white hover:bg-gray-50">
+                                            <span className="text-sm font-medium">Thought {thought.thoughtId.slice(-8)}</span>
+                                            <span className="text-xs text-gray-500 ml-2">
+                                              ({thought.stages.size}/6 stages)
+                                            </span>
+                                          </summary>
+                                          <div className="p-2 bg-gray-100 space-y-1">
+                                            {/* H3ERE Stages - Copy the stage rendering code here */}
+                                            {stageNames.map(stageName => {
+                                              const stage = thought.stages.get(stageName);
+                                              if (!stage) {
+                                                return (
+                                                  <div
+                                                    key={stageName}
+                                                    className="flex items-center p-2 rounded text-xs bg-gray-200"
+                                                  >
+                                                    <span className="mr-2">{stageIcons[stageName]}</span>
+                                                    <span className="text-gray-500">
+                                                      {stageName.replace(/_/g, ' ').toUpperCase()}
+                                                    </span>
+                                                  </div>
+                                                );
+                                              }
+
+                                              const timestamp = stage.data.timestamp
+                                                ? new Date(stage.data.timestamp).toLocaleTimeString('en-US', {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                    second: '2-digit',
+                                                    fractionalSecondDigits: 3
+                                                  })
+                                                : '';
+
+                                              return (
+                                                <details key={stageName} className="bg-green-50 border border-green-200 rounded">
+                                                  <summary className="flex items-center p-2 cursor-pointer hover:bg-green-100 rounded text-xs">
+                                                    <span className="mr-2">{stageIcons[stageName]}</span>
+                                                    <span className="font-medium flex-1">
+                                                      {stageName.replace(/_/g, ' ').toUpperCase()}
+                                                    </span>
+                                                    {timestamp && (
+                                                      <span className="text-gray-500 text-xs mr-2">{timestamp}</span>
+                                                    )}
+                                                    <span className="text-green-600">✓</span>
+                                                  </summary>
+                                                  <div className="p-2 bg-white border-t border-green-200 text-xs">
+                                                    <pre className="whitespace-pre-wrap break-words text-xs">
+                                                      {JSON.stringify(stage.data, null, 2)}
+                                                    </pre>
+                                                  </div>
+                                                </details>
+                                              );
+                                            })}
+                                          </div>
+                                        </details>
+                                      ))}
+                                    </div>
+                                  </details>
+                                </div>
+                              )}
                             </div>
                           );
                         } else {

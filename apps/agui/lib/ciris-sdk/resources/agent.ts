@@ -19,8 +19,16 @@ export class AgentResource extends BaseResource {
       channel_id?: string;
       context?: Record<string, any>;
     } = {}
-  ): Promise<{ status: string; thought_id: string; message: string }> {
-    return this.transport.post<{ status: string; thought_id: string; message: string }>('/v1/agent/message', {
+  ): Promise<{
+    message_id: string;
+    task_id: string | null;
+    channel_id: string;
+    submitted_at: string;
+    accepted: boolean;
+    rejection_reason: string | null;
+    rejection_detail: string | null;
+  }> {
+    return this.transport.post('/v1/agent/message', {
       message,
       channel_id: options.channel_id || 'web_ui',
       context: options.context
