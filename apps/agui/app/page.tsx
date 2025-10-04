@@ -16,7 +16,9 @@ export default function InteractPage() {
   const timelineContainerRef = useRef<HTMLDivElement>(null);
 
   // Track which task_ids belong to messages we sent
+  // Use both state (for re-renders) and ref (for latest value in closures)
   const [ourTaskIds, setOurTaskIds] = useState<Set<string>>(new Set());
+  const ourTaskIdsRef = useRef<Set<string>>(new Set());
 
   // Task-centric state: Map of taskId -> task data
   const [tasks, setTasks] = useState<Map<string, {
@@ -140,13 +142,16 @@ export default function InteractPage() {
 
               // Create task if it doesn't exist
               if (!task) {
+                const isOurs = ourTaskIdsRef.current.has(task_id);
+                console.log(`🧠 Creating task ${task_id.slice(-8)}, isOurs: ${isOurs}`);
+
                 task = {
                   taskId: task_id,
                   description: event.task_description || '',
                   color: taskColors[taskColorIndex.current % taskColors.length],
                   completed: false,
                   firstTimestamp: event.timestamp || new Date().toISOString(),
-                  isOurs: ourTaskIds.has(task_id),
+                  isOurs: isOurs,
                   thoughts: []
                 };
                 taskColorIndex.current++;
@@ -196,8 +201,12 @@ export default function InteractPage() {
     },
     onSuccess: (data) => {
       if (data.accepted && data.task_id) {
-        // Track this task_id as ours
+        // Track this task_id as ours (update both state and ref)
         setOurTaskIds(prev => new Set(prev).add(data.task_id!));
+        ourTaskIdsRef.current.add(data.task_id);
+
+        console.log('🎯 Tracking our task_id:', data.task_id);
+        console.log('🎯 ourTaskIdsRef now contains:', Array.from(ourTaskIdsRef.current));
 
         // Message submitted for async processing
         toast.success(`Message accepted (task: ${data.task_id.slice(-8)})`, { duration: 2000 });
