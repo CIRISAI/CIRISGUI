@@ -580,11 +580,12 @@ export default function InteractPage() {
                 <p className="text-sm text-gray-600 mb-4">
                   Real-time view of the agent's memory graph showing concepts, observations, and relationships formed over the past week. Hover over nodes to see details.
                 </p>
-                <div className="w-full bg-gray-50 rounded-lg p-4">
+                <div className="w-full bg-gray-50 rounded-lg p-4 overflow-x-auto">
                   {memorySvgContent ? (
-                    <div className="w-full" style={{ maxWidth: '100%', overflow: 'visible' }}>
-                      <div dangerouslySetInnerHTML={{ __html: memorySvgContent }} style={{ width: '100%', height: 'auto' }} />
-                    </div>
+                    <div
+                      dangerouslySetInnerHTML={{ __html: memorySvgContent }}
+                      className="w-full [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-w-full"
+                    />
                   ) : (
                     <div className="flex items-center justify-center h-[150px] text-gray-500">
                       Loading memory visualization...
