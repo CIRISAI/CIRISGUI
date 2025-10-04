@@ -355,6 +355,12 @@ export default function InteractPage() {
                                 }`}>
                                   {msg.content}
                                 </div>
+                                {/* Debug: Show task correlation info for user messages */}
+                                {!msg.is_agent && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {task ? `✓ Task: ${task.taskId.slice(-8)}` : '⚠ No task found'}
+                                  </div>
+                                )}
                               </div>
 
                               {/* Show related task if it exists */}
@@ -363,7 +369,10 @@ export default function InteractPage() {
                                   <details className="border rounded-lg">
                                     <summary className={`cursor-pointer p-3 ${task.color} text-white rounded-t-lg ${task.completed ? 'opacity-60' : ''}`}>
                                       <div className="flex justify-between items-center">
-                                        <span className="font-medium text-sm">🧠 {task.description || task.taskId.slice(-8)}</span>
+                                        <span className="font-medium text-sm">
+                                          🧠 {task.description || task.taskId.slice(-8)}
+                                          <span className="ml-2 text-xs opacity-75">[Task: {task.taskId}]</span>
+                                        </span>
                                         <span className="text-xs">{task.thoughts.length} thought(s)</span>
                                       </div>
                                     </summary>
