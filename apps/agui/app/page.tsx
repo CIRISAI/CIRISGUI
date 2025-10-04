@@ -185,18 +185,18 @@ export default function InteractPage() {
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (msg: string) => {
-      return await cirisClient.agent.interact(msg, {
+      return await cirisClient.agent.submitMessage(msg, {
         channel_id: 'api_0.0.0.0_8080',
       });
     },
     onSuccess: (data) => {
-      // Immediately refetch history to show the response
-      queryClient.invalidateQueries({ queryKey: ['conversation-history'] });
+      // Message submitted for async processing
+      toast.success(`Message submitted (${data.thought_id.slice(-8)})`, { duration: 2000 });
 
-      // Show the agent's response in a toast
-      if (data.response) {
-        toast.success(`Agent: ${data.response}`, { duration: 5000 });
-      }
+      // Refetch history after a short delay to show user message
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['conversation-history'] });
+      }, 500);
     },
     onError: (error: any) => {
       toast.error(`Error: ${error.message}`);

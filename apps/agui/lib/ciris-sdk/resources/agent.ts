@@ -11,7 +11,24 @@ import {
 
 export class AgentResource extends BaseResource {
   /**
-   * Send a message to the agent
+   * Submit a message for async processing (SSE-compatible)
+   */
+  async submitMessage(
+    message: string,
+    options: {
+      channel_id?: string;
+      context?: Record<string, any>;
+    } = {}
+  ): Promise<{ status: string; thought_id: string; message: string }> {
+    return this.transport.post<{ status: string; thought_id: string; message: string }>('/v1/agent/message', {
+      message,
+      channel_id: options.channel_id || 'web_ui',
+      context: options.context
+    });
+  }
+
+  /**
+   * Send a message to the agent (legacy, synchronous)
    */
   async interact(
     message: string,
