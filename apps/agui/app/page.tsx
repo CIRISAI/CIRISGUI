@@ -66,10 +66,19 @@ export default function InteractPage() {
   // Connect to reasoning stream
   useEffect(() => {
     const token = cirisClient.auth.getAccessToken();
-    if (!token) return;
+    if (!token) {
+      console.log('⚠️ No auth token, skipping SSE connection');
+      return;
+    }
+    if (!currentAgent) {
+      console.log('⚠️ No current agent, skipping SSE connection');
+      return;
+    }
 
     const apiBaseUrl = cirisClient.getBaseURL();
     const streamUrl = `${apiBaseUrl}/v1/system/runtime/reasoning-stream`;
+
+    console.log('🔌 Connecting to SSE stream:', streamUrl);
 
     const abortController = new AbortController();
 
@@ -85,6 +94,8 @@ export default function InteractPage() {
         });
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        console.log('✅ SSE stream connected');
 
         const reader = response.body?.getReader();
         if (!reader) throw new Error('Response body is not readable');
@@ -131,6 +142,7 @@ export default function InteractPage() {
     const processEvent = (eventType: string, eventData: string) => {
       if (eventType === 'step_update') {
         const update = JSON.parse(eventData);
+        console.log('📡 Received SSE event:', eventType, 'with', update.events?.length || 0, 'events');
         if (update.events && Array.isArray(update.events)) {
           update.events.forEach((event: any) => {
             const { event_type, thought_id, task_id } = event;
