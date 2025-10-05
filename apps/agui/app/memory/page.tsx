@@ -413,8 +413,8 @@ export default function MemoryPage() {
           ) : (
             <div
               ref={svgContainerRef}
-              className="w-full overflow-x-auto border border-gray-200 rounded-lg bg-gray-50"
-              style={{ minHeight: '600px' }}
+              className="w-full overflow-x-auto border border-gray-200 rounded-lg bg-gray-50 [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-w-full"
+              style={{ minHeight: '400px' }}
             />
           )}
 

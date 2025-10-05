@@ -574,25 +574,21 @@ export default function InteractPage() {
             </div>
 
             {/* Memory Visualization */}
-            <div className="bg-white shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Snapshot of the CIRIS Agent Memory</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Real-time view of the agent's memory graph showing concepts, observations, and relationships formed over the past week. Hover over nodes to see details.
-                </p>
-                <div className="w-full bg-gray-50 rounded-lg p-4 overflow-x-auto">
-                  {memorySvgContent ? (
-                    <div
-                      dangerouslySetInnerHTML={{ __html: memorySvgContent }}
-                      className="w-full [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-w-full"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-[150px] text-gray-500">
-                      Loading memory visualization...
-                    </div>
-                  )}
+            <div className="bg-white shadow rounded-lg p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Snapshot of the CIRIS Agent Memory</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Real-time view of the agent's memory graph showing concepts, observations, and relationships formed over the past week.
+              </p>
+              {memorySvgContent ? (
+                <div
+                  dangerouslySetInnerHTML={{ __html: memorySvgContent }}
+                  className="w-full [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-w-full"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[150px] text-gray-500">
+                  Loading memory visualization...
                 </div>
-              </div>
+              )}
             </div>
             </div>
           </>
