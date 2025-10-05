@@ -365,9 +365,9 @@ export default function InteractPage() {
                                   {msg.content}
                                 </div>
                                 {/* Debug: Show task correlation info for user messages */}
-                                {!msg.is_agent && (
+                                {!msg.is_agent && task && (
                                   <div className="text-xs text-gray-500 mt-1">
-                                    {task ? `✓ Task: ${task.taskId.slice(-8)}` : '⚠ No task found'}
+                                    ✓ Task: {task.taskId.slice(-8)}
                                   </div>
                                 )}
                               </div>
