@@ -260,7 +260,7 @@ export default function InteractPage() {
   const { data: memorySvgContent } = useQuery<string>({
     queryKey: ['memory-visualization-interact'],
     queryFn: async () => {
-      return await cirisClient.memory.getVisualization({
+      const svg = await cirisClient.memory.getVisualization({
         scope: 'local',
         layout: 'timeline',
         hours: 168,
@@ -269,6 +269,10 @@ export default function InteractPage() {
         limit: 1000,
         include_metrics: false
       });
+
+      // Strip out the embedded title/metadata text elements from the SVG
+      // The backend includes "Memory Graph Visualization", "Time Range", etc.
+      return svg.replace(/<text[^>]*>(Memory Graph Visualization|Time Range:|Nodes:|Layout:)[^<]*<\/text>/gi, '');
     },
     enabled: !!currentAgent,
     refetchInterval: 30000, // Refresh every 30 seconds
@@ -580,10 +584,13 @@ export default function InteractPage() {
                 Real-time view of the agent's memory graph showing concepts, observations, and relationships formed over the past week.
               </p>
               {memorySvgContent ? (
-                <div
-                  dangerouslySetInnerHTML={{ __html: memorySvgContent }}
-                  className="w-full [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-w-full"
-                />
+                <div className="w-full overflow-x-auto">
+                  <div
+                    dangerouslySetInnerHTML={{ __html: memorySvgContent }}
+                    className="[&>svg]:max-w-full [&>svg]:h-auto [&>svg]:w-full"
+                    style={{ minHeight: '300px' }}
+                  />
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-[150px] text-gray-500">
                   Loading memory visualization...
