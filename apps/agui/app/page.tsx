@@ -326,9 +326,11 @@ export default function InteractPage() {
       });
     });
 
-    // Add tasks that are NOT ours (admin tasks, system tasks, etc)
+    // Add tasks that are NOT already shown under a message
+    // This includes: admin/system tasks (not ours), and our tasks that don't have a message yet
+    const shownTaskIds = new Set(items.filter(item => item.relatedTask).map(item => item.relatedTask.taskId));
     Array.from(tasks.values()).forEach(task => {
-      if (!task.isOurs) {
+      if (!shownTaskIds.has(task.taskId)) {
         items.push({
           type: 'task',
           timestamp: task.firstTimestamp,
