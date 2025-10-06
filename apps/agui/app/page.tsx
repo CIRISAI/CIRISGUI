@@ -160,6 +160,7 @@ export default function InteractPage() {
               if (!task) {
                 const isOurs = ourTaskIdsRef.current.has(task_id);
                 console.log(`🧠 Creating task ${task_id.slice(-8)}, isOurs: ${isOurs}`);
+                console.log(`🧠 Task description:`, event.task_description);
 
                 task = {
                   taskId: task_id,
@@ -173,6 +174,8 @@ export default function InteractPage() {
                 taskColorIndex.current++;
                 newTasks.set(task_id, task);
               }
+
+              console.log(`🎨 Processing ${event_type} for task ${task_id.slice(-8)}, thought ${thought_id.slice(-8)}`);
 
               // Find or create thought
               let thought = task.thoughts.find(t => t.thoughtId === thought_id);
