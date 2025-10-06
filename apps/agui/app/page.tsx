@@ -20,6 +20,10 @@ export default function InteractPage() {
   const [ourTaskIds, setOurTaskIds] = useState<Set<string>>(new Set());
   const ourTaskIdsRef = useRef<Set<string>>(new Set());
 
+  // Map message_id -> task_id for proper correlation
+  const [messageToTaskMap, setMessageToTaskMap] = useState<Map<string, string>>(new Map());
+  const messageToTaskMapRef = useRef<Map<string, string>>(new Map());
+
   // Task-centric state: Map of taskId -> task data
   const [tasks, setTasks] = useState<Map<string, {
     taskId: string;
@@ -212,12 +216,16 @@ export default function InteractPage() {
       });
     },
     onSuccess: (data) => {
-      if (data.accepted && data.task_id) {
+      if (data.accepted && data.task_id && data.message_id) {
         // Track this task_id as ours (update both state and ref)
         setOurTaskIds(prev => new Set(prev).add(data.task_id!));
         ourTaskIdsRef.current.add(data.task_id);
 
-        console.log('🎯 Tracking our task_id:', data.task_id);
+        // Map message_id to task_id for correlation
+        setMessageToTaskMap(prev => new Map(prev).set(data.message_id, data.task_id!));
+        messageToTaskMapRef.current.set(data.message_id, data.task_id);
+
+        console.log('🎯 Tracking our task_id:', data.task_id, 'for message_id:', data.message_id);
         console.log('🎯 ourTaskIdsRef now contains:', Array.from(ourTaskIdsRef.current));
 
         // Message submitted for async processing
@@ -301,11 +309,14 @@ export default function InteractPage() {
 
     // Add messages with their related tasks
     messages.forEach(msg => {
-      // Find if there's a task that belongs to this message
-      // Tasks are correlated by being sent shortly after the message
-      const relatedTask = !msg.is_agent
-        ? Array.from(tasks.values()).find(task => task.isOurs && !items.some(item => item.relatedTask?.taskId === task.taskId))
-        : undefined;
+      // Find if there's a task that belongs to this message using message_id -> task_id mapping
+      let relatedTask = undefined;
+      if (!msg.is_agent && msg.id) {
+        const taskId = messageToTaskMap.get(msg.id);
+        if (taskId) {
+          relatedTask = tasks.get(taskId);
+        }
+      }
 
       items.push({
         type: 'message',
@@ -330,7 +341,7 @@ export default function InteractPage() {
     return items.sort((a, b) =>
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
-  }, [messages, tasks]);
+  }, [messages, tasks, messageToTaskMap]);
 
   // Auto-scroll to bottom when timeline changes
   useEffect(() => {
