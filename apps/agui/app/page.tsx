@@ -310,11 +310,15 @@ export default function InteractPage() {
     // Add messages with their related tasks
     messages.forEach(msg => {
       // Find if there's a task that belongs to this message using message_id -> task_id mapping
+      // The message.id from history matches the message_id we got when submitting
       let relatedTask = undefined;
       if (!msg.is_agent && msg.id) {
         const taskId = messageToTaskMap.get(msg.id);
         if (taskId) {
           relatedTask = tasks.get(taskId);
+          console.log('🔗 Matched message', msg.id, 'to task', taskId);
+        } else {
+          console.log('⚠️ No task mapping for message', msg.id);
         }
       }
 
