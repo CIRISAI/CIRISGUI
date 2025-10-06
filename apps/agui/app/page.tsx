@@ -270,6 +270,81 @@ export default function InteractPage() {
 
   const stageNames = ['thought_start', 'snapshot_and_context', 'dma_results', 'aspdma_result', 'conscience_result', 'action_result'];
 
+  // Render expandable JSON tree
+  const renderExpandableData = (data: any, depth: number = 0): React.ReactNode => {
+    if (data === null || data === undefined) {
+      return <span className="text-gray-500 italic">null</span>;
+    }
+
+    if (typeof data === 'string') {
+      // Truncate long strings
+      if (data.length > 200) {
+        return (
+          <details className="inline">
+            <summary className="cursor-pointer text-blue-600 hover:underline">
+              "{data.substring(0, 100)}..." ({data.length} chars)
+            </summary>
+            <div className="ml-4 mt-1 text-xs whitespace-pre-wrap break-words">{data}</div>
+          </details>
+        );
+      }
+      return <span className="text-green-700">"{data}"</span>;
+    }
+
+    if (typeof data === 'number') {
+      return <span className="text-purple-600">{data}</span>;
+    }
+
+    if (typeof data === 'boolean') {
+      return <span className="text-orange-600">{data.toString()}</span>;
+    }
+
+    if (Array.isArray(data)) {
+      if (data.length === 0) {
+        return <span className="text-gray-500">[]</span>;
+      }
+      return (
+        <details className="ml-4" open={depth < 1}>
+          <summary className="cursor-pointer hover:bg-gray-100 px-1 rounded">
+            Array ({data.length} items)
+          </summary>
+          <div className="ml-4 border-l-2 border-gray-300 pl-2">
+            {data.map((item, idx) => (
+              <div key={idx} className="py-1">
+                <span className="text-gray-500 mr-2">[{idx}]:</span>
+                {renderExpandableData(item, depth + 1)}
+              </div>
+            ))}
+          </div>
+        </details>
+      );
+    }
+
+    if (typeof data === 'object') {
+      const entries = Object.entries(data);
+      if (entries.length === 0) {
+        return <span className="text-gray-500">{'{}'}</span>;
+      }
+      return (
+        <details className="ml-4" open={depth < 1}>
+          <summary className="cursor-pointer hover:bg-gray-100 px-1 rounded">
+            Object ({entries.length} fields)
+          </summary>
+          <div className="ml-4 border-l-2 border-gray-300 pl-2">
+            {entries.map(([key, value]) => (
+              <div key={key} className="py-1">
+                <span className="text-blue-600 font-medium mr-2">{key}:</span>
+                {renderExpandableData(value, depth + 1)}
+              </div>
+            ))}
+          </div>
+        </details>
+      );
+    }
+
+    return <span>{String(data)}</span>;
+  };
+
   // Load SVG pipeline visualization
   const [svgContent, setSvgContent] = useState<string>('');
   useEffect(() => {
@@ -469,10 +544,8 @@ export default function InteractPage() {
                                                     )}
                                                     <span className="text-green-600">✓</span>
                                                   </summary>
-                                                  <div className="p-2 bg-white border-t border-green-200 text-xs">
-                                                    <pre className="whitespace-pre-wrap break-words text-xs">
-                                                      {JSON.stringify(stage.data, null, 2)}
-                                                    </pre>
+                                                  <div className="p-2 bg-white border-t border-green-200 text-xs font-mono">
+                                                    {renderExpandableData(stage.data)}
                                                   </div>
                                                 </details>
                                               );
@@ -546,10 +619,8 @@ export default function InteractPage() {
                                               )}
                                               <span className="text-green-600">✓</span>
                                             </summary>
-                                            <div className="p-2 bg-white border-t border-green-200 text-xs">
-                                              <pre className="whitespace-pre-wrap break-words text-xs">
-                                                {JSON.stringify(stage.data, null, 2)}
-                                              </pre>
+                                            <div className="p-2 bg-white border-t border-green-200 text-xs font-mono">
+                                              {renderExpandableData(stage.data)}
                                             </div>
                                           </details>
                                         );
