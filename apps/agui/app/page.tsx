@@ -345,6 +345,69 @@ export default function InteractPage() {
     return <span>{String(data)}</span>;
   };
 
+  // Render structured stage data with key fields highlighted
+  const renderStageData = (stageName: string, data: any): React.ReactNode => {
+    // Define key fields to show for each stage type
+    const keyFieldsMap: Record<string, string[]> = {
+      'thought_start': ['task_description', 'thought_content'],
+      'snapshot_and_context': ['context', 'system_snapshot'],
+      'dma_results': ['dma_outputs', 'csdma_output', 'dsdma_output', 'pdma_output'],
+      'aspdma_result': ['selected_action', 'action_reasoning', 'all_actions'],
+      'conscience_result': ['conscience_decision', 'conscience_reasoning', 'conscience_score'],
+      'action_result': ['action_executed', 'action_result', 'action_output']
+    };
+
+    const keyFields = keyFieldsMap[stageName] || [];
+    const otherFields = Object.keys(data).filter(key => !keyFields.includes(key));
+
+    return (
+      <div className="space-y-2">
+        {/* Key fields */}
+        {keyFields.map(field => {
+          if (!data[field]) return null;
+          const value = data[field];
+
+          return (
+            <div key={field} className="py-1">
+              <div className="text-blue-600 font-semibold mb-1">{field.replace(/_/g, ' ')}:</div>
+              <div className="ml-2">
+                {typeof value === 'string' && value.length > 200 ? (
+                  <details>
+                    <summary className="cursor-pointer text-gray-700 hover:underline">
+                      {value.substring(0, 100)}... ({value.length} chars)
+                    </summary>
+                    <div className="mt-1 text-xs whitespace-pre-wrap break-words bg-gray-50 p-2 rounded">
+                      {value}
+                    </div>
+                  </details>
+                ) : (
+                  renderExpandableData(value, 1)
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Other fields under "View details" */}
+        {otherFields.length > 0 && (
+          <details className="mt-2">
+            <summary className="cursor-pointer text-gray-600 hover:bg-gray-100 px-2 py-1 rounded text-xs">
+              📋 View details ({otherFields.length} more fields)
+            </summary>
+            <div className="ml-2 mt-2 space-y-1 border-l-2 border-gray-300 pl-2">
+              {otherFields.map(field => (
+                <div key={field} className="py-1">
+                  <span className="text-blue-600 font-medium text-xs mr-2">{field}:</span>
+                  {renderExpandableData(data[field], 2)}
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
+    );
+  };
+
   // Load SVG pipeline visualization
   const [svgContent, setSvgContent] = useState<string>('');
   useEffect(() => {
@@ -544,8 +607,8 @@ export default function InteractPage() {
                                                     )}
                                                     <span className="text-green-600">✓</span>
                                                   </summary>
-                                                  <div className="p-2 bg-white border-t border-green-200 text-xs font-mono">
-                                                    {renderExpandableData(stage.data)}
+                                                  <div className="p-2 bg-white border-t border-green-200 text-xs">
+                                                    {renderStageData(stageName, stage.data)}
                                                   </div>
                                                 </details>
                                               );
@@ -619,8 +682,8 @@ export default function InteractPage() {
                                               )}
                                               <span className="text-green-600">✓</span>
                                             </summary>
-                                            <div className="p-2 bg-white border-t border-green-200 text-xs font-mono">
-                                              {renderExpandableData(stage.data)}
+                                            <div className="p-2 bg-white border-t border-green-200 text-xs">
+                                              {renderStageData(stageName, stage.data)}
                                             </div>
                                           </details>
                                         );
