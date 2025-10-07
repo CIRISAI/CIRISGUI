@@ -414,16 +414,20 @@ export default function InteractPage() {
     // Special rendering for aspdma_result
     if (stageName === 'aspdma_result') {
       const actionEmojis: Record<string, string> = {
+        // Action Handler
         'SPEAK': '💬',
+        'TOOL': '🔧',
+        'OBSERVE': '👁️',
+        // Memory Handler
+        'MEMORIZE': '💾',
+        'RECALL': '🔍',
+        'FORGET': '🗑️',
+        // Deferral Handler
         'DEFER': '⏸️',
         'PONDER': '🤔',
-        'RECALL': '🔍',
-        'SEARCH': '🔎',
-        'LEARN': '📚',
-        'CREATE': '✨',
-        'UPDATE': '📝',
-        'DELETE': '🗑️',
-        'EXECUTE': '⚡'
+        'REJECT': '❌',
+        // Completion
+        'TASK_COMPLETE': '✅'
       };
 
       const selectedAction = data.selected_action || 'UNKNOWN';
