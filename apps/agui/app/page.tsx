@@ -411,11 +411,71 @@ export default function InteractPage() {
       );
     }
 
+    // Special rendering for aspdma_result
+    if (stageName === 'aspdma_result') {
+      const actionEmojis: Record<string, string> = {
+        'SPEAK': '💬',
+        'DEFER': '⏸️',
+        'PONDER': '🤔',
+        'RECALL': '🔍',
+        'SEARCH': '🔎',
+        'LEARN': '📚',
+        'CREATE': '✨',
+        'UPDATE': '📝',
+        'DELETE': '🗑️',
+        'EXECUTE': '⚡'
+      };
+
+      const selectedAction = data.selected_action || 'UNKNOWN';
+      const actionEmoji = actionEmojis[selectedAction] || '❓';
+      const actionReasoning = data.action_reasoning || '';
+
+      const otherFields = Object.keys(data).filter(
+        key => !['selected_action', 'action_reasoning'].includes(key)
+      );
+
+      return (
+        <div className="space-y-3">
+          {/* Selected Action */}
+          <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="text-4xl">{actionEmoji}</div>
+            <div className="flex-1">
+              <div className="text-blue-900 font-bold text-lg">{selectedAction}</div>
+            </div>
+          </div>
+
+          {/* Action Reasoning */}
+          <div>
+            <div className="text-blue-600 font-semibold mb-2">Reasoning:</div>
+            <div className="ml-2 text-gray-700 whitespace-pre-wrap">
+              {actionReasoning}
+            </div>
+          </div>
+
+          {/* Other fields under "View details" */}
+          {otherFields.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-gray-600 hover:bg-gray-100 px-2 py-1 rounded text-xs">
+                📋 View details ({otherFields.length} more fields)
+              </summary>
+              <div className="ml-2 mt-2 space-y-1 border-l-2 border-gray-300 pl-2">
+                {otherFields.map(field => (
+                  <div key={field} className="py-1">
+                    <span className="text-blue-600 font-medium text-xs mr-2">{field}:</span>
+                    {renderExpandableData(data[field], 2)}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      );
+    }
+
     // Define key fields to show for each stage type
     const keyFieldsMap: Record<string, string[]> = {
       'thought_start': ['task_description', 'thought_content'],
       'snapshot_and_context': ['context', 'system_snapshot'],
-      'aspdma_result': ['selected_action', 'action_reasoning', 'all_actions'],
       'conscience_result': ['conscience_decision', 'conscience_reasoning', 'conscience_score'],
       'action_result': ['action_executed', 'action_result', 'action_output']
     };
