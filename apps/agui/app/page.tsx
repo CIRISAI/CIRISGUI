@@ -347,11 +347,74 @@ export default function InteractPage() {
 
   // Render structured stage data with key fields highlighted
   const renderStageData = (stageName: string, data: any): React.ReactNode => {
+    // Special rendering for dma_results
+    if (stageName === 'dma_results') {
+      const [selectedDMA, setSelectedDMA] = useState<'csdma' | 'dsdma' | 'pdma'>('csdma');
+
+      const dmaTypes = [
+        { key: 'csdma', label: 'Common Sense', icon: '🧠', field: 'csdma_output' },
+        { key: 'dsdma', label: 'Domain Specific', icon: '🎯', field: 'dsdma_output' },
+        { key: 'pdma', label: 'Ethical', icon: '⚖️', field: 'pdma_output' }
+      ];
+
+      const otherFields = Object.keys(data).filter(
+        key => !['csdma_output', 'dsdma_output', 'pdma_output', 'dma_outputs'].includes(key)
+      );
+
+      return (
+        <div className="space-y-3">
+          {/* DMA Type Selector */}
+          <div className="flex gap-2">
+            {dmaTypes.map(dma => (
+              <button
+                key={dma.key}
+                onClick={() => setSelectedDMA(dma.key as any)}
+                className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                  selectedDMA === dma.key
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 hover:border-gray-400 bg-white'
+                }`}
+              >
+                <div className="text-2xl mb-1">{dma.icon}</div>
+                <div className="text-xs font-medium text-center">{dma.label}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* Selected DMA Output */}
+          <div className="bg-white border border-gray-200 rounded-lg p-3">
+            <div className="text-blue-600 font-semibold mb-2">
+              {dmaTypes.find(d => d.key === selectedDMA)?.label} Output:
+            </div>
+            <div className="ml-2">
+              {renderExpandableData(data[dmaTypes.find(d => d.key === selectedDMA)?.field || ''], 1)}
+            </div>
+          </div>
+
+          {/* Other fields under "View details" */}
+          {otherFields.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-gray-600 hover:bg-gray-100 px-2 py-1 rounded text-xs">
+                📋 View details ({otherFields.length} more fields)
+              </summary>
+              <div className="ml-2 mt-2 space-y-1 border-l-2 border-gray-300 pl-2">
+                {otherFields.map(field => (
+                  <div key={field} className="py-1">
+                    <span className="text-blue-600 font-medium text-xs mr-2">{field}:</span>
+                    {renderExpandableData(data[field], 2)}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      );
+    }
+
     // Define key fields to show for each stage type
     const keyFieldsMap: Record<string, string[]> = {
       'thought_start': ['task_description', 'thought_content'],
       'snapshot_and_context': ['context', 'system_snapshot'],
-      'dma_results': ['dma_outputs', 'csdma_output', 'dsdma_output', 'pdma_output'],
       'aspdma_result': ['selected_action', 'action_reasoning', 'all_actions'],
       'conscience_result': ['conscience_decision', 'conscience_reasoning', 'conscience_score'],
       'action_result': ['action_executed', 'action_result', 'action_output']
