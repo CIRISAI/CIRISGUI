@@ -275,13 +275,13 @@ export default function InteractPage() {
     const [selectedDMA, setSelectedDMA] = useState<'csdma' | 'dsdma' | 'pdma'>('csdma');
 
     const dmaTypes = [
-      { key: 'csdma', label: 'Common Sense', icon: '🧠', field: 'csdma_output' },
-      { key: 'dsdma', label: 'Domain Specific', icon: '🎯', field: 'dsdma_output' },
-      { key: 'pdma', label: 'Ethical', icon: '⚖️', field: 'pdma_output' }
+      { key: 'csdma', label: 'Common Sense', icon: '🧠', field: 'csdma' },
+      { key: 'dsdma', label: 'Domain Specific', icon: '🎯', field: 'dsdma' },
+      { key: 'pdma', label: 'Ethical', icon: '⚖️', field: 'pdma' }
     ];
 
     const otherFields = Object.keys(data).filter(
-      key => !['csdma_output', 'dsdma_output', 'pdma_output', 'dma_outputs'].includes(key)
+      key => !['csdma', 'dsdma', 'pdma', 'dma_outputs'].includes(key)
     );
 
     return (
@@ -747,6 +747,14 @@ export default function InteractPage() {
                                                     {timestamp && (
                                                       <span className="text-gray-500 text-xs mr-2">{timestamp}</span>
                                                     )}
+                                                    {/* Show DMA icons for dma_results stage */}
+                                                    {stageName === 'dma_results' && (
+                                                      <span className="flex gap-1 mr-2">
+                                                        <span title="Common Sense DMA">🧠</span>
+                                                        <span title="Domain Specific DMA">🎯</span>
+                                                        <span title="Ethical DMA">⚖️</span>
+                                                      </span>
+                                                    )}
                                                     <span className="text-green-600">✓</span>
                                                   </summary>
                                                   <div className="p-2 bg-white border-t border-green-200 text-xs">
@@ -821,6 +829,14 @@ export default function InteractPage() {
                                               </span>
                                               {timestamp && (
                                                 <span className="text-gray-500 text-xs mr-2">{timestamp}</span>
+                                              )}
+                                              {/* Show DMA icons for dma_results stage */}
+                                              {stageName === 'dma_results' && (
+                                                <span className="flex gap-1 mr-2">
+                                                  <span title="Common Sense DMA">🧠</span>
+                                                  <span title="Domain Specific DMA">🎯</span>
+                                                  <span title="Ethical DMA">⚖️</span>
+                                                </span>
                                               )}
                                               <span className="text-green-600">✓</span>
                                             </summary>
