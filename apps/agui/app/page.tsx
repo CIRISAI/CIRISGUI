@@ -435,12 +435,17 @@ export default function InteractPage() {
         'TASK_COMPLETE': '✅'
       };
 
-      const selectedAction = data.selected_action || 'UNKNOWN';
+      // Extract action name, removing "HandlerActionType." prefix if present
+      let selectedAction = data.selected_action || 'UNKNOWN';
+      if (selectedAction.includes('.')) {
+        selectedAction = selectedAction.split('.').pop() || selectedAction;
+      }
+
       const actionEmoji = actionEmojis[selectedAction] || '❓';
-      const actionReasoning = data.action_reasoning || '';
+      const actionReasoning = data.action_rationale || data.action_reasoning || '';
 
       const otherFields = Object.keys(data).filter(
-        key => !['selected_action', 'action_reasoning'].includes(key)
+        key => !['selected_action', 'action_rationale', 'action_reasoning'].includes(key)
       );
 
       return (
