@@ -54,6 +54,7 @@ function Navbar({ className }: { className?: string }) {
     { name: "Account Settings", href: "/account", minRole: "OBSERVER" },
     { name: "Consent Management", href: "/account/consent", minRole: "OBSERVER" },
     { name: "Privacy Settings", href: "/account/privacy", minRole: "OBSERVER" },
+    { name: "Billing", href: "/billing", minRole: "OBSERVER" },
   ];
 
   const visibleNavigation = navigation.filter((item) => hasRole(item.minRole));
