@@ -951,9 +951,12 @@ export default function InteractPage() {
                                                           title="Common Sense DMA"
                                                           className="cursor-pointer hover:scale-110 transition-transform"
                                                           onClick={(e) => {
-                                                            e.stopPropagation();
                                                             const details = e.currentTarget.closest('details');
-                                                            if (details && !details.open) details.open = true;
+                                                            if (details?.open) {
+                                                              // Already open, just switch DMA (prevent toggle)
+                                                              e.stopPropagation();
+                                                            }
+                                                            // Let it expand naturally if closed
                                                             setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'csdma' }));
                                                           }}
                                                         >🧠</span>
@@ -961,9 +964,12 @@ export default function InteractPage() {
                                                           title="Domain Specific DMA"
                                                           className="cursor-pointer hover:scale-110 transition-transform"
                                                           onClick={(e) => {
-                                                            e.stopPropagation();
                                                             const details = e.currentTarget.closest('details');
-                                                            if (details && !details.open) details.open = true;
+                                                            if (details?.open) {
+                                                              // Already open, just switch DMA (prevent toggle)
+                                                              e.stopPropagation();
+                                                            }
+                                                            // Let it expand naturally if closed
                                                             setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'dsdma' }));
                                                           }}
                                                         >🎯</span>
@@ -971,9 +977,12 @@ export default function InteractPage() {
                                                           title="Ethical DMA"
                                                           className="cursor-pointer hover:scale-110 transition-transform"
                                                           onClick={(e) => {
-                                                            e.stopPropagation();
                                                             const details = e.currentTarget.closest('details');
-                                                            if (details && !details.open) details.open = true;
+                                                            if (details?.open) {
+                                                              // Already open, just switch DMA (prevent toggle)
+                                                              e.stopPropagation();
+                                                            }
+                                                            // Let it expand naturally if closed
                                                             setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'pdma' }));
                                                           }}
                                                         >⚖️</span>
@@ -1100,9 +1109,12 @@ export default function InteractPage() {
                                                     title="Common Sense DMA"
                                                     className="cursor-pointer hover:scale-110 transition-transform"
                                                     onClick={(e) => {
-                                                      e.stopPropagation();
                                                       const details = e.currentTarget.closest('details');
-                                                      if (details && !details.open) details.open = true;
+                                                      if (details?.open) {
+                                                        // Already open, just switch DMA (prevent toggle)
+                                                        e.stopPropagation();
+                                                      }
+                                                      // Let it expand naturally if closed
                                                       setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'csdma' }));
                                                     }}
                                                   >🧠</span>
@@ -1110,9 +1122,12 @@ export default function InteractPage() {
                                                     title="Domain Specific DMA"
                                                     className="cursor-pointer hover:scale-110 transition-transform"
                                                     onClick={(e) => {
-                                                      e.stopPropagation();
                                                       const details = e.currentTarget.closest('details');
-                                                      if (details && !details.open) details.open = true;
+                                                      if (details?.open) {
+                                                        // Already open, just switch DMA (prevent toggle)
+                                                        e.stopPropagation();
+                                                      }
+                                                      // Let it expand naturally if closed
                                                       setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'dsdma' }));
                                                     }}
                                                   >🎯</span>
@@ -1120,9 +1135,12 @@ export default function InteractPage() {
                                                     title="Ethical DMA"
                                                     className="cursor-pointer hover:scale-110 transition-transform"
                                                     onClick={(e) => {
-                                                      e.stopPropagation();
                                                       const details = e.currentTarget.closest('details');
-                                                      if (details && !details.open) details.open = true;
+                                                      if (details?.open) {
+                                                        // Already open, just switch DMA (prevent toggle)
+                                                        e.stopPropagation();
+                                                      }
+                                                      // Let it expand naturally if closed
                                                       setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'pdma' }));
                                                     }}
                                                   >⚖️</span>
