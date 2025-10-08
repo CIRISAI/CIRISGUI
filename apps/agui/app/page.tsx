@@ -271,8 +271,12 @@ export default function InteractPage() {
   const stageNames = ['thought_start', 'snapshot_and_context', 'dma_results', 'aspdma_result', 'conscience_result', 'action_result'];
 
   // DMA Results Selector Component
-  const DMAResultsSelector: React.FC<{ data: any; renderExpandableData: (data: any, depth: number) => React.ReactNode }> = ({ data, renderExpandableData }) => {
-    const [selectedDMA, setSelectedDMA] = useState<'csdma' | 'dsdma' | 'pdma'>('csdma');
+  const DMAResultsSelector: React.FC<{
+    data: any;
+    renderExpandableData: (data: any, depth: number) => React.ReactNode;
+    initialSelected?: 'csdma' | 'dsdma' | 'pdma';
+  }> = ({ data, renderExpandableData, initialSelected = 'csdma' }) => {
+    const [selectedDMA, setSelectedDMA] = useState<'csdma' | 'dsdma' | 'pdma'>(initialSelected);
 
     const dmaTypes = [
       { key: 'csdma', label: 'Common Sense', icon: '🧠', field: 'csdma' },
@@ -310,7 +314,23 @@ export default function InteractPage() {
             {dmaTypes.find(d => d.key === selectedDMA)?.label} Output:
           </div>
           <div className="ml-2">
-            {renderExpandableData(data[dmaTypes.find(d => d.key === selectedDMA)?.field || ''], 1)}
+            {(() => {
+              const dmaOutput = data[dmaTypes.find(d => d.key === selectedDMA)?.field || ''];
+              if (dmaOutput && typeof dmaOutput === 'object' && !Array.isArray(dmaOutput)) {
+                // Expand object directly
+                return (
+                  <div className="space-y-1 border-l-2 border-gray-300 pl-2">
+                    {Object.entries(dmaOutput).map(([key, value]) => (
+                      <div key={key} className="py-1">
+                        <span className="text-blue-600 font-medium text-xs mr-2">{key}:</span>
+                        {renderExpandableData(value, 2)}
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              return renderExpandableData(dmaOutput, 1);
+            })()}
           </div>
         </div>
 
@@ -409,11 +429,15 @@ export default function InteractPage() {
     return <span>{String(data)}</span>;
   };
 
+  // State to track selected DMA for each stage
+  const [selectedDMAs, setSelectedDMAs] = useState<Record<string, 'csdma' | 'dsdma' | 'pdma'>>({});
+
   // Render structured stage data with key fields highlighted
-  const renderStageData = (stageName: string, data: any): React.ReactNode => {
+  const renderStageData = (stageName: string, data: any, stageKey?: string): React.ReactNode => {
     // Special rendering for dma_results
     if (stageName === 'dma_results') {
-      return <DMAResultsSelector data={data} renderExpandableData={renderExpandableData} />;
+      const initialSelected = stageKey ? selectedDMAs[stageKey] : undefined;
+      return <DMAResultsSelector data={data} renderExpandableData={renderExpandableData} initialSelected={initialSelected} />;
     }
 
     // Special rendering for aspdma_result
@@ -824,15 +848,42 @@ export default function InteractPage() {
                                                     {/* Show DMA icons for dma_results stage */}
                                                     {stageName === 'dma_results' && (
                                                       <span className="flex gap-1 mr-2">
-                                                        <span title="Common Sense DMA">🧠</span>
-                                                        <span title="Domain Specific DMA">🎯</span>
-                                                        <span title="Ethical DMA">⚖️</span>
+                                                        <span
+                                                          title="Common Sense DMA"
+                                                          className="cursor-pointer hover:scale-110 transition-transform"
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const details = e.currentTarget.closest('details');
+                                                            if (details && !details.open) details.open = true;
+                                                            setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'csdma' }));
+                                                          }}
+                                                        >🧠</span>
+                                                        <span
+                                                          title="Domain Specific DMA"
+                                                          className="cursor-pointer hover:scale-110 transition-transform"
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const details = e.currentTarget.closest('details');
+                                                            if (details && !details.open) details.open = true;
+                                                            setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'dsdma' }));
+                                                          }}
+                                                        >🎯</span>
+                                                        <span
+                                                          title="Ethical DMA"
+                                                          className="cursor-pointer hover:scale-110 transition-transform"
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const details = e.currentTarget.closest('details');
+                                                            if (details && !details.open) details.open = true;
+                                                            setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'pdma' }));
+                                                          }}
+                                                        >⚖️</span>
                                                       </span>
                                                     )}
                                                     <span className="text-green-600">✓</span>
                                                   </summary>
                                                   <div className="p-2 bg-white border-t border-green-200 text-xs">
-                                                    {renderStageData(stageName, stage.data)}
+                                                    {renderStageData(stageName, stage.data, `thought-${thought.thoughtId}-dma`)}
                                                   </div>
                                                 </details>
                                               );
@@ -907,15 +958,42 @@ export default function InteractPage() {
                                               {/* Show DMA icons for dma_results stage */}
                                               {stageName === 'dma_results' && (
                                                 <span className="flex gap-1 mr-2">
-                                                  <span title="Common Sense DMA">🧠</span>
-                                                  <span title="Domain Specific DMA">🎯</span>
-                                                  <span title="Ethical DMA">⚖️</span>
+                                                  <span
+                                                    title="Common Sense DMA"
+                                                    className="cursor-pointer hover:scale-110 transition-transform"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      const details = e.currentTarget.closest('details');
+                                                      if (details && !details.open) details.open = true;
+                                                      setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'csdma' }));
+                                                    }}
+                                                  >🧠</span>
+                                                  <span
+                                                    title="Domain Specific DMA"
+                                                    className="cursor-pointer hover:scale-110 transition-transform"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      const details = e.currentTarget.closest('details');
+                                                      if (details && !details.open) details.open = true;
+                                                      setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'dsdma' }));
+                                                    }}
+                                                  >🎯</span>
+                                                  <span
+                                                    title="Ethical DMA"
+                                                    className="cursor-pointer hover:scale-110 transition-transform"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      const details = e.currentTarget.closest('details');
+                                                      if (details && !details.open) details.open = true;
+                                                      setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'pdma' }));
+                                                    }}
+                                                  >⚖️</span>
                                                 </span>
                                               )}
                                               <span className="text-green-600">✓</span>
                                             </summary>
                                             <div className="p-2 bg-white border-t border-green-200 text-xs">
-                                              {renderStageData(stageName, stage.data)}
+                                              {renderStageData(stageName, stage.data, `thought-${thought.thoughtId}-dma`)}
                                             </div>
                                           </details>
                                         );
