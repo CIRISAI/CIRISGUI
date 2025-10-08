@@ -14,6 +14,7 @@ import { UsersResource } from './resources/users';
 import { ManagerResource } from './resources/manager';
 import { ConsentResource } from './resources/consent';
 import { DSARResource } from './resources/dsar';
+import { BillingResource } from './resources/billing';
 import { User } from './types';
 import { SDK_VERSION } from './version';
 
@@ -42,6 +43,7 @@ export class CIRISClient {
   public readonly manager: ManagerResource;
   public readonly consent: ConsentResource;
   public readonly dsar: DSARResource;
+  public readonly billing: BillingResource;
 
   constructor(options: CIRISClientOptions = {}) {
     // Determine the default base URL based on environment
@@ -90,6 +92,7 @@ export class CIRISClient {
     this.manager = new ManagerResource(this.transport);
     this.consent = new ConsentResource(this.transport);
     this.dsar = new DSARResource(this.transport);
+    this.billing = new BillingResource(this.transport);
   }
 
   /**
