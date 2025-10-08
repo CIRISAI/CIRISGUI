@@ -655,28 +655,6 @@ export default function InteractPage() {
       .catch(err => console.error('Failed to load SVG:', err));
   }, []);
 
-  // Fetch memory visualization
-  const { data: memorySvgContent } = useQuery<string>({
-    queryKey: ['memory-visualization-interact'],
-    queryFn: async () => {
-      const svg = await cirisClient.memory.getVisualization({
-        scope: 'local',
-        layout: 'timeline',
-        hours: 168,
-        width: 1200,
-        height: 600,
-        limit: 1000,
-        include_metrics: false
-      });
-
-      // Strip out the embedded title/metadata text elements from the SVG
-      // The backend includes "Memory Graph Visualization", "Time Range", etc.
-      return svg.replace(/<text[^>]*>(Memory Graph Visualization|Time Range:|Nodes:|Layout:)[^<]*<\/text>/gi, '');
-    },
-    enabled: !!currentAgent,
-    refetchInterval: 30000, // Refresh every 30 seconds
-  });
-
   // Create unified timeline of messages and tasks
   const timeline = useMemo(() => {
     const items: Array<{
@@ -997,26 +975,6 @@ export default function InteractPage() {
               </div>
             </div>
 
-            {/* Memory Visualization */}
-            <div className="bg-white shadow rounded-lg p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Snapshot of the CIRIS Agent Memory</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Real-time view of the agent's memory graph showing concepts, observations, and relationships formed over the past week.
-              </p>
-              {memorySvgContent ? (
-                <div className="w-full overflow-x-auto">
-                  <div
-                    dangerouslySetInnerHTML={{ __html: memorySvgContent }}
-                    className="[&>svg]:max-w-full [&>svg]:h-auto [&>svg]:w-full"
-                    style={{ minHeight: '300px' }}
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-[150px] text-gray-500">
-                  Loading memory visualization...
-                </div>
-              )}
-            </div>
             </div>
           </>
         )}
