@@ -14,6 +14,7 @@ export default function InteractPage() {
   const [message, setMessage] = useState('');
   const queryClient = useQueryClient();
   const timelineContainerRef = useRef<HTMLDivElement>(null);
+  const [viewMode, setViewMode] = useState<'detailed' | 'basic'>('detailed');
 
   // Track which task_ids belong to messages we sent
   // Use both state (for re-renders) and ref (for latest value in closures)
@@ -827,9 +828,37 @@ export default function InteractPage() {
       `}</style>
       <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6 max-w-7xl mx-auto">
-          <p className="text-sm text-gray-600 max-w-3xl">
-            DATUM is a CIRIS Agent demonstrating an ethical AI agent's decision making process. Ask Datum a question about CIRIS or an ethical dilemma, and see the reasoning below. Note the agent may choose not to answer, and your data IS NOT PRIVATE as this is a BETA interface for demonstration and research purposes only.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-sm text-gray-600 max-w-3xl">
+              DATUM is a CIRIS Agent demonstrating an ethical AI agent's decision making process. Ask Datum a question about CIRIS or an ethical dilemma, and see the reasoning below. Note the agent may choose not to answer, and your data IS NOT PRIVATE as this is a BETA interface for demonstration and research purposes only.
+            </p>
+
+            {/* View Mode Toggle */}
+            <div className="flex-shrink-0">
+              <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('basic')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                    viewMode === 'basic'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Basic
+                </button>
+                <button
+                  onClick={() => setViewMode('detailed')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                    viewMode === 'detailed'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Detailed
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {currentAgent && (
@@ -880,28 +909,37 @@ export default function InteractPage() {
                                       </div>
                                     </summary>
                                     <div className="p-3 space-y-2 bg-gray-50">
-                                      {task.thoughts.map((thought: any) => (
-                                        <details key={thought.thoughtId} className="border border-gray-200 rounded">
-                                          <summary className="cursor-pointer p-2 bg-white hover:bg-gray-50">
-                                            {(() => {
-                                              const thoughtStart = thought.stages.get('thought_start');
-                                              const thoughtContent = thoughtStart?.data?.thought_content || 'Processing thought...';
-                                              const truncated = thoughtContent.length > 80
-                                                ? thoughtContent.substring(0, 80) + '...'
-                                                : thoughtContent;
-                                              return (
-                                                <>
-                                                  <span className="text-sm font-medium">{truncated}</span>
-                                                  <span className="text-xs text-gray-500 ml-2">
-                                                    ({thought.stages.size}/6 stages)
-                                                  </span>
-                                                </>
-                                              );
-                                            })()}
-                                          </summary>
-                                          <div className="p-2 bg-gray-100 space-y-1">
-                                            {/* H3ERE Stages - Copy the stage rendering code here */}
-                                            {stageNames.map(stageName => {
+                                      {task.thoughts.map((thought: any) => {
+                                        const thoughtStart = thought.stages.get('thought_start');
+                                        const thoughtContent = thoughtStart?.data?.thought_content || 'Processing thought...';
+                                        const truncated = thoughtContent.length > 80
+                                          ? thoughtContent.substring(0, 80) + '...'
+                                          : thoughtContent;
+
+                                        if (viewMode === 'basic') {
+                                          // Basic mode: just show thought summary without stages
+                                          return (
+                                            <div key={thought.thoughtId} className="border border-gray-200 rounded p-2 bg-white">
+                                              <span className="text-sm font-medium">{truncated}</span>
+                                              <span className="text-xs text-gray-500 ml-2">
+                                                ({thought.stages.size}/6 stages)
+                                              </span>
+                                            </div>
+                                          );
+                                        }
+
+                                        // Detailed mode: show expandable stages
+                                        return (
+                                          <details key={thought.thoughtId} className="border border-gray-200 rounded">
+                                            <summary className="cursor-pointer p-2 bg-white hover:bg-gray-50">
+                                              <span className="text-sm font-medium">{truncated}</span>
+                                              <span className="text-xs text-gray-500 ml-2">
+                                                ({thought.stages.size}/6 stages)
+                                              </span>
+                                            </summary>
+                                            <div className="p-2 bg-gray-100 space-y-1">
+                                              {/* H3ERE Stages */}
+                                              {stageNames.map(stageName => {
                                               const stage = thought.stages.get(stageName);
                                               if (!stage) {
                                                 return (
@@ -1029,7 +1067,8 @@ export default function InteractPage() {
                                             })}
                                           </div>
                                         </details>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </details>
                                 </div>
@@ -1048,28 +1087,37 @@ export default function InteractPage() {
                                 </div>
                               </summary>
                               <div className="p-3 space-y-2 bg-gray-50">
-                                {task.thoughts.map((thought: any) => (
-                                  <details key={thought.thoughtId} className="border border-gray-200 rounded">
-                                    <summary className="cursor-pointer p-2 bg-white hover:bg-gray-50">
-                                      {(() => {
-                                        const thoughtStart = thought.stages.get('thought_start');
-                                        const thoughtContent = thoughtStart?.data?.thought_content || 'Processing thought...';
-                                        const truncated = thoughtContent.length > 80
-                                          ? thoughtContent.substring(0, 80) + '...'
-                                          : thoughtContent;
-                                        return (
-                                          <>
-                                            <span className="text-sm font-medium">{truncated}</span>
-                                            <span className="text-xs text-gray-500 ml-2">
-                                              ({thought.stages.size}/6 stages)
-                                            </span>
-                                          </>
-                                        );
-                                      })()}
-                                    </summary>
-                                    <div className="p-2 bg-gray-100 space-y-1">
-                                      {/* H3ERE Stages */}
-                                      {stageNames.map(stageName => {
+                                {task.thoughts.map((thought: any) => {
+                                  const thoughtStart = thought.stages.get('thought_start');
+                                  const thoughtContent = thoughtStart?.data?.thought_content || 'Processing thought...';
+                                  const truncated = thoughtContent.length > 80
+                                    ? thoughtContent.substring(0, 80) + '...'
+                                    : thoughtContent;
+
+                                  if (viewMode === 'basic') {
+                                    // Basic mode: just show thought summary without stages
+                                    return (
+                                      <div key={thought.thoughtId} className="border border-gray-200 rounded p-2 bg-white">
+                                        <span className="text-sm font-medium">{truncated}</span>
+                                        <span className="text-xs text-gray-500 ml-2">
+                                          ({thought.stages.size}/6 stages)
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+
+                                  // Detailed mode: show expandable stages
+                                  return (
+                                    <details key={thought.thoughtId} className="border border-gray-200 rounded">
+                                      <summary className="cursor-pointer p-2 bg-white hover:bg-gray-50">
+                                        <span className="text-sm font-medium">{truncated}</span>
+                                        <span className="text-xs text-gray-500 ml-2">
+                                          ({thought.stages.size}/6 stages)
+                                        </span>
+                                      </summary>
+                                      <div className="p-2 bg-gray-100 space-y-1">
+                                        {/* H3ERE Stages */}
+                                        {stageNames.map(stageName => {
                                         const stage = thought.stages.get(stageName);
                                         if (!stage) {
                                           return (
@@ -1198,7 +1246,8 @@ export default function InteractPage() {
                                       })}
                                     </div>
                                   </details>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </details>
                           );
