@@ -602,11 +602,91 @@ export default function InteractPage() {
       );
     }
 
+    // Special rendering for action_result
+    if (stageName === 'action_result') {
+      const actionEmojis: Record<string, string> = {
+        'SPEAK': '💬', 'speak': '💬',
+        'TOOL': '🔧', 'tool': '🔧',
+        'OBSERVE': '👁️', 'observe': '👁️',
+        'MEMORIZE': '💾', 'memorize': '💾',
+        'RECALL': '🔍', 'recall': '🔍',
+        'FORGET': '🗑️', 'forget': '🗑️',
+        'DEFER': '⏸️', 'defer': '⏸️',
+        'PONDER': '🤔', 'ponder': '🤔',
+        'REJECT': '❌', 'reject': '❌',
+        'TASK_COMPLETE': '✅', 'task_complete': '✅'
+      };
+
+      let actionExecuted = data.action_executed || 'UNKNOWN';
+      if (actionExecuted.includes('.')) {
+        actionExecuted = actionExecuted.split('.').pop() || actionExecuted;
+      }
+      const actionUpper = actionExecuted.toUpperCase();
+
+      const actionEmoji = actionEmojis[actionExecuted] || actionEmojis[actionUpper] || '⚡';
+      const executionSuccess = data.execution_success ?? null;
+      const auditHash = data.audit_entry_hash || '';
+      const hashEnd = auditHash ? auditHash.slice(-8) : '';
+
+      const otherFields = Object.keys(data).filter(
+        key => !['action_executed', 'execution_success', 'audit_entry_hash'].includes(key)
+      );
+
+      return (
+        <div className="space-y-3">
+          {/* Action Executed */}
+          <div className={`flex items-center gap-3 border rounded-lg p-3 ${
+            executionSuccess ? 'bg-green-50 border-green-200' : executionSuccess === false ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
+          }`}>
+            <div className="text-4xl">{actionEmoji}</div>
+            <div className="flex-1">
+              <div className={`font-bold text-lg ${
+                executionSuccess ? 'text-green-900' : executionSuccess === false ? 'text-red-900' : 'text-gray-900'
+              }`}>
+                {actionUpper}
+              </div>
+              {executionSuccess !== null && (
+                <div className="text-xs text-gray-600 mt-1">
+                  {executionSuccess ? '✓ Executed successfully' : '✗ Execution failed'}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Audit Hash */}
+          {auditHash && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <div className="text-blue-600 font-semibold text-sm">📋 HASH TABLE ENTRY</div>
+                <div className="font-mono text-xs text-blue-900">...{hashEnd}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Other fields under "View details" */}
+          {otherFields.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-gray-600 hover:bg-gray-100 px-2 py-1 rounded text-xs">
+                📋 View details ({otherFields.length} more fields)
+              </summary>
+              <div className="ml-2 mt-2 space-y-1 border-l-2 border-gray-300 pl-2">
+                {otherFields.map(field => (
+                  <div key={field} className="py-1">
+                    <span className="text-blue-600 font-medium text-xs mr-2">{field}:</span>
+                    {renderExpandableData(data[field], 2)}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      );
+    }
+
     // Define key fields to show for each stage type
     const keyFieldsMap: Record<string, string[]> = {
       'thought_start': ['task_description', 'thought_content'],
-      'snapshot_and_context': ['context', 'system_snapshot'],
-      'action_result': ['action_executed', 'action_result', 'action_output']
+      'snapshot_and_context': ['context', 'system_snapshot']
     };
 
     const keyFields = keyFieldsMap[stageName] || [];
