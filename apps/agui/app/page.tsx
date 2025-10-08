@@ -914,10 +914,14 @@ export default function InteractPage() {
                                           : thoughtContent;
 
                                         if (viewMode === 'basic') {
-                                          // Basic mode: show compact key stages (DMA, Action, Conscience)
+                                          // Basic mode: show compact key stages (DMA, Action, Conscience, Final Action)
                                           const dmaStage = thought.stages.get('dma_results');
                                           const aspdmaStage = thought.stages.get('aspdma_result');
                                           const conscienceStage = thought.stages.get('conscience_result');
+                                          const actionStage = thought.stages.get('action_result');
+
+                                          // Check if there's recursion (stages will be repeated)
+                                          const hasRecursion = aspdmaStage?.data?.is_recursive || conscienceStage?.data?.is_recursive;
 
                                           return (
                                             <div key={thought.thoughtId} className="border border-gray-200 rounded p-2 bg-white space-y-1">
@@ -933,7 +937,7 @@ export default function InteractPage() {
                                                   </span>
                                                 )}
 
-                                                {/* Selected Action */}
+                                                {/* First pass: Selected Action */}
                                                 {aspdmaStage?.data?.selected_action && (
                                                   <>
                                                     <span className="text-gray-400">→</span>
@@ -943,7 +947,7 @@ export default function InteractPage() {
                                                   </>
                                                 )}
 
-                                                {/* Conscience Status */}
+                                                {/* First pass: Conscience Status */}
                                                 {conscienceStage && aspdmaStage?.data?.selected_action && (
                                                   <>
                                                     <span className="text-gray-400">→</span>
@@ -959,9 +963,28 @@ export default function InteractPage() {
                                                   </>
                                                 )}
 
-                                                {/* Recursive indicator */}
-                                                {(aspdmaStage?.data?.is_recursive || conscienceStage?.data?.is_recursive) && (
-                                                  <span className="text-gray-400" title="Recursive">🔁</span>
+                                                {/* Second pass (recursive): Action and Conscience */}
+                                                {hasRecursion && aspdmaStage?.data?.selected_action && (
+                                                  <>
+                                                    <span className="text-gray-400">→</span>
+                                                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded font-bold opacity-75" title="Recursive">
+                                                      {getActionLabel(aspdmaStage.data.selected_action)}
+                                                    </span>
+                                                    <span className="text-gray-400">→</span>
+                                                    <span className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded font-bold opacity-75" title="Recursive">
+                                                      PASSED
+                                                    </span>
+                                                  </>
+                                                )}
+
+                                                {/* Final executed action */}
+                                                {actionStage?.data?.action_executed && (
+                                                  <>
+                                                    <span className="text-gray-400">→</span>
+                                                    <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded font-bold" title="Executed">
+                                                      {getActionLabel(actionStage.data.action_executed)}
+                                                    </span>
+                                                  </>
                                                 )}
                                               </div>
                                             </div>
@@ -1123,10 +1146,14 @@ export default function InteractPage() {
                                     : thoughtContent;
 
                                   if (viewMode === 'basic') {
-                                    // Basic mode: show compact key stages (DMA, Action, Conscience)
+                                    // Basic mode: show compact key stages (DMA, Action, Conscience, Final Action)
                                     const dmaStage = thought.stages.get('dma_results');
                                     const aspdmaStage = thought.stages.get('aspdma_result');
                                     const conscienceStage = thought.stages.get('conscience_result');
+                                    const actionStage = thought.stages.get('action_result');
+
+                                    // Check if there's recursion (stages will be repeated)
+                                    const hasRecursion = aspdmaStage?.data?.is_recursive || conscienceStage?.data?.is_recursive;
 
                                     return (
                                       <div key={thought.thoughtId} className="border border-gray-200 rounded p-2 bg-white space-y-1">
@@ -1142,7 +1169,7 @@ export default function InteractPage() {
                                             </span>
                                           )}
 
-                                          {/* Selected Action */}
+                                          {/* First pass: Selected Action */}
                                           {aspdmaStage?.data?.selected_action && (
                                             <>
                                               <span className="text-gray-400">→</span>
@@ -1152,7 +1179,7 @@ export default function InteractPage() {
                                             </>
                                           )}
 
-                                          {/* Conscience Status */}
+                                          {/* First pass: Conscience Status */}
                                           {conscienceStage && aspdmaStage?.data?.selected_action && (
                                             <>
                                               <span className="text-gray-400">→</span>
@@ -1168,9 +1195,28 @@ export default function InteractPage() {
                                             </>
                                           )}
 
-                                          {/* Recursive indicator */}
-                                          {(aspdmaStage?.data?.is_recursive || conscienceStage?.data?.is_recursive) && (
-                                            <span className="text-gray-400" title="Recursive">🔁</span>
+                                          {/* Second pass (recursive): Action and Conscience */}
+                                          {hasRecursion && aspdmaStage?.data?.selected_action && (
+                                            <>
+                                              <span className="text-gray-400">→</span>
+                                              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded font-bold opacity-75" title="Recursive">
+                                                {getActionLabel(aspdmaStage.data.selected_action)}
+                                              </span>
+                                              <span className="text-gray-400">→</span>
+                                              <span className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded font-bold opacity-75" title="Recursive">
+                                                PASSED
+                                              </span>
+                                            </>
+                                          )}
+
+                                          {/* Final executed action */}
+                                          {actionStage?.data?.action_executed && (
+                                            <>
+                                              <span className="text-gray-400">→</span>
+                                              <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded font-bold" title="Executed">
+                                                {getActionLabel(actionStage.data.action_executed)}
+                                              </span>
+                                            </>
                                           )}
                                         </div>
                                       </div>
