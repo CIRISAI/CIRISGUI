@@ -883,10 +883,21 @@ export default function InteractPage() {
                                       {task.thoughts.map((thought: any) => (
                                         <details key={thought.thoughtId} className="border border-gray-200 rounded">
                                           <summary className="cursor-pointer p-2 bg-white hover:bg-gray-50">
-                                            <span className="text-sm font-medium">Thought {thought.thoughtId.slice(-8)}</span>
-                                            <span className="text-xs text-gray-500 ml-2">
-                                              ({thought.stages.size}/6 stages)
-                                            </span>
+                                            {(() => {
+                                              const thoughtStart = thought.stages.get('thought_start');
+                                              const thoughtContent = thoughtStart?.data?.thought_content || 'Processing thought...';
+                                              const truncated = thoughtContent.length > 80
+                                                ? thoughtContent.substring(0, 80) + '...'
+                                                : thoughtContent;
+                                              return (
+                                                <>
+                                                  <span className="text-sm font-medium">{truncated}</span>
+                                                  <span className="text-xs text-gray-500 ml-2">
+                                                    ({thought.stages.size}/6 stages)
+                                                  </span>
+                                                </>
+                                              );
+                                            })()}
                                           </summary>
                                           <div className="p-2 bg-gray-100 space-y-1">
                                             {/* H3ERE Stages - Copy the stage rendering code here */}
@@ -1040,10 +1051,21 @@ export default function InteractPage() {
                                 {task.thoughts.map((thought: any) => (
                                   <details key={thought.thoughtId} className="border border-gray-200 rounded">
                                     <summary className="cursor-pointer p-2 bg-white hover:bg-gray-50">
-                                      <span className="text-sm font-medium">Thought {thought.thoughtId.slice(-8)}</span>
-                                      <span className="text-xs text-gray-500 ml-2">
-                                        ({thought.stages.size}/6 stages)
-                                      </span>
+                                      {(() => {
+                                        const thoughtStart = thought.stages.get('thought_start');
+                                        const thoughtContent = thoughtStart?.data?.thought_content || 'Processing thought...';
+                                        const truncated = thoughtContent.length > 80
+                                          ? thoughtContent.substring(0, 80) + '...'
+                                          : thoughtContent;
+                                        return (
+                                          <>
+                                            <span className="text-sm font-medium">{truncated}</span>
+                                            <span className="text-xs text-gray-500 ml-2">
+                                              ({thought.stages.size}/6 stages)
+                                            </span>
+                                          </>
+                                        );
+                                      })()}
                                     </summary>
                                     <div className="p-2 bg-gray-100 space-y-1">
                                       {/* H3ERE Stages */}
