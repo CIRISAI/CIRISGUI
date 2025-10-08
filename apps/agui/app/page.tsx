@@ -260,16 +260,13 @@ export default function InteractPage() {
     sendMessageMutation.mutate(msgToSend);
   };
 
-  const stageIcons: Record<string, string> = {
-    'thought_start': '🎬',
-    'snapshot_and_context': '📸',
-    'dma_results': '🧠',
-    'aspdma_result': '🎯',
-    'conscience_result': '✅',
-    'action_result': '⚡'
-  };
-
   const stageNames = ['thought_start', 'snapshot_and_context', 'dma_results', 'aspdma_result', 'conscience_result', 'action_result'];
+
+  // Get stage number based on position
+  const getStageNumber = (stageName: string): string => {
+    const index = stageNames.indexOf(stageName);
+    return index >= 0 ? `${index + 1}` : '?';
+  };
 
   // DMA Results Selector Component
   const DMAResultsSelector: React.FC<{
@@ -947,7 +944,7 @@ export default function InteractPage() {
                                                     key={stageName}
                                                     className="flex items-center p-2 rounded text-xs bg-gray-200"
                                                   >
-                                                    <span className="mr-2">{stageIcons[stageName]}</span>
+                                                    <span className="mr-2 font-bold text-gray-600">{getStageNumber(stageName)}</span>
                                                     <span className="text-gray-500">
                                                       {stageName.replace(/_/g, ' ').toUpperCase()}
                                                     </span>
@@ -986,7 +983,7 @@ export default function InteractPage() {
                                               return (
                                                 <details key={stageName} className="bg-green-50 border border-green-200 rounded">
                                                   <summary className="flex items-center p-2 cursor-pointer hover:bg-green-100 rounded text-xs">
-                                                    <span className="mr-2">{stageIcons[stageName]}</span>
+                                                    <span className="mr-2 font-bold text-green-700">{getStageNumber(stageName)}</span>
                                                     <span className="font-medium flex-1">
                                                       {stageName.replace(/_/g, ' ').toUpperCase()}
                                                     </span>
@@ -1125,7 +1122,7 @@ export default function InteractPage() {
                                               key={stageName}
                                               className="flex items-center p-2 rounded text-xs bg-gray-200"
                                             >
-                                              <span className="mr-2">{stageIcons[stageName]}</span>
+                                              <span className="mr-2 font-bold text-gray-600">{getStageNumber(stageName)}</span>
                                               <span className="text-gray-500">
                                                 {stageName.replace(/_/g, ' ').toUpperCase()}
                                               </span>
@@ -1165,7 +1162,7 @@ export default function InteractPage() {
                                         return (
                                           <details key={stageName} className="bg-green-50 border border-green-200 rounded">
                                             <summary className="flex items-center p-2 cursor-pointer hover:bg-green-100 rounded text-xs">
-                                              <span className="mr-2">{stageIcons[stageName]}</span>
+                                              <span className="mr-2 font-bold text-green-700">{getStageNumber(stageName)}</span>
                                               <span className="font-medium flex-1">
                                                 {stageName.replace(/_/g, ' ').toUpperCase()}
                                               </span>
