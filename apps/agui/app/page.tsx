@@ -914,13 +914,56 @@ export default function InteractPage() {
                                           : thoughtContent;
 
                                         if (viewMode === 'basic') {
-                                          // Basic mode: just show thought summary without stages
+                                          // Basic mode: show compact key stages (DMA, Action, Conscience)
+                                          const dmaStage = thought.stages.get('dma_results');
+                                          const aspdmaStage = thought.stages.get('aspdma_result');
+                                          const conscienceStage = thought.stages.get('conscience_result');
+
                                           return (
-                                            <div key={thought.thoughtId} className="border border-gray-200 rounded p-2 bg-white">
-                                              <span className="text-sm font-medium">{truncated}</span>
-                                              <span className="text-xs text-gray-500 ml-2">
-                                                ({thought.stages.size}/6 stages)
-                                              </span>
+                                            <div key={thought.thoughtId} className="border border-gray-200 rounded p-2 bg-white space-y-1">
+                                              {/* Thought summary */}
+                                              <div className="text-sm font-medium mb-2">{truncated}</div>
+
+                                              {/* Compact stage indicators */}
+                                              <div className="flex flex-wrap gap-1 items-center text-xs">
+                                                {/* DMA indicators */}
+                                                {dmaStage && (
+                                                  <span className="px-1.5 py-0.5 bg-gray-100 rounded font-bold" title="DMAs">
+                                                    CS·DS·E
+                                                  </span>
+                                                )}
+
+                                                {/* Selected Action */}
+                                                {aspdmaStage?.data?.selected_action && (
+                                                  <>
+                                                    <span className="text-gray-400">→</span>
+                                                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded font-bold">
+                                                      {getActionLabel(aspdmaStage.data.selected_action)}
+                                                    </span>
+                                                  </>
+                                                )}
+
+                                                {/* Conscience Status */}
+                                                {conscienceStage && aspdmaStage?.data?.selected_action && (
+                                                  <>
+                                                    <span className="text-gray-400">→</span>
+                                                    <span className={`px-1.5 py-0.5 rounded font-bold ${
+                                                      getConscienceStatus(conscienceStage.data.conscience_passed, aspdmaStage.data.selected_action) === 'EXEMPT'
+                                                        ? 'bg-gray-100 text-gray-700'
+                                                        : conscienceStage.data.conscience_passed
+                                                          ? 'bg-green-100 text-green-800'
+                                                          : 'bg-red-100 text-red-800'
+                                                    }`}>
+                                                      {getConscienceStatus(conscienceStage.data.conscience_passed, aspdmaStage.data.selected_action)}
+                                                    </span>
+                                                  </>
+                                                )}
+
+                                                {/* Recursive indicator */}
+                                                {(aspdmaStage?.data?.is_recursive || conscienceStage?.data?.is_recursive) && (
+                                                  <span className="text-gray-400" title="Recursive">🔁</span>
+                                                )}
+                                              </div>
                                             </div>
                                           );
                                         }
@@ -1080,13 +1123,56 @@ export default function InteractPage() {
                                     : thoughtContent;
 
                                   if (viewMode === 'basic') {
-                                    // Basic mode: just show thought summary without stages
+                                    // Basic mode: show compact key stages (DMA, Action, Conscience)
+                                    const dmaStage = thought.stages.get('dma_results');
+                                    const aspdmaStage = thought.stages.get('aspdma_result');
+                                    const conscienceStage = thought.stages.get('conscience_result');
+
                                     return (
-                                      <div key={thought.thoughtId} className="border border-gray-200 rounded p-2 bg-white">
-                                        <span className="text-sm font-medium">{truncated}</span>
-                                        <span className="text-xs text-gray-500 ml-2">
-                                          ({thought.stages.size}/6 stages)
-                                        </span>
+                                      <div key={thought.thoughtId} className="border border-gray-200 rounded p-2 bg-white space-y-1">
+                                        {/* Thought summary */}
+                                        <div className="text-sm font-medium mb-2">{truncated}</div>
+
+                                        {/* Compact stage indicators */}
+                                        <div className="flex flex-wrap gap-1 items-center text-xs">
+                                          {/* DMA indicators */}
+                                          {dmaStage && (
+                                            <span className="px-1.5 py-0.5 bg-gray-100 rounded font-bold" title="DMAs">
+                                              CS·DS·E
+                                            </span>
+                                          )}
+
+                                          {/* Selected Action */}
+                                          {aspdmaStage?.data?.selected_action && (
+                                            <>
+                                              <span className="text-gray-400">→</span>
+                                              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded font-bold">
+                                                {getActionLabel(aspdmaStage.data.selected_action)}
+                                              </span>
+                                            </>
+                                          )}
+
+                                          {/* Conscience Status */}
+                                          {conscienceStage && aspdmaStage?.data?.selected_action && (
+                                            <>
+                                              <span className="text-gray-400">→</span>
+                                              <span className={`px-1.5 py-0.5 rounded font-bold ${
+                                                getConscienceStatus(conscienceStage.data.conscience_passed, aspdmaStage.data.selected_action) === 'EXEMPT'
+                                                  ? 'bg-gray-100 text-gray-700'
+                                                  : conscienceStage.data.conscience_passed
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : 'bg-red-100 text-red-800'
+                                              }`}>
+                                                {getConscienceStatus(conscienceStage.data.conscience_passed, aspdmaStage.data.selected_action)}
+                                              </span>
+                                            </>
+                                          )}
+
+                                          {/* Recursive indicator */}
+                                          {(aspdmaStage?.data?.is_recursive || conscienceStage?.data?.is_recursive) && (
+                                            <span className="text-gray-400" title="Recursive">🔁</span>
+                                          )}
+                                        </div>
                                       </div>
                                     );
                                   }
