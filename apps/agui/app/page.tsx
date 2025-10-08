@@ -486,11 +486,102 @@ export default function InteractPage() {
       );
     }
 
+    // Special rendering for conscience_result
+    if (stageName === 'conscience_result') {
+      const consciencePassed = data.conscience_passed;
+      const epistemicData = data.epistemic_data || {};
+      const overrideReason = data.conscience_override_reason;
+
+      const entropyLevel = epistemicData.entropy_level ?? null;
+      const coherenceLevel = epistemicData.coherence_level ?? null;
+      const uncertaintyAcknowledged = epistemicData.uncertainty_acknowledged ?? null;
+      const reasoningTransparency = epistemicData.reasoning_transparency ?? null;
+
+      // Check if values meet thresholds
+      const entropyOk = entropyLevel !== null && entropyLevel < 0.4;
+      const coherenceOk = coherenceLevel !== null && coherenceLevel > 0.6;
+      const uncertaintyOk = uncertaintyAcknowledged === true;
+      const transparencyOk = reasoningTransparency === 1;
+
+      const otherFields = Object.keys(data).filter(
+        key => !['conscience_passed', 'epistemic_data', 'conscience_override_reason'].includes(key)
+      );
+
+      return (
+        <div className="space-y-3">
+          {/* Conscience Status */}
+          <div className={`flex items-center gap-3 border rounded-lg p-3 ${
+            consciencePassed ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+          }`}>
+            <div className="text-4xl">{consciencePassed ? '✅' : '❌'}</div>
+            <div className="flex-1">
+              <div className={`font-bold text-lg ${consciencePassed ? 'text-green-900' : 'text-red-900'}`}>
+                {consciencePassed ? 'PASSED' : 'FAILED'}
+              </div>
+              {overrideReason && (
+                <div className="text-sm text-gray-700 mt-1">Override: {overrideReason}</div>
+              )}
+            </div>
+          </div>
+
+          {/* Epistemic Data */}
+          <div>
+            <div className="text-blue-600 font-semibold mb-2">Epistemic Values:</div>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Entropy */}
+              <div className={`p-2 rounded border ${entropyOk ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="text-xs font-medium text-gray-600">Entropy Level</div>
+                <div className="text-lg font-bold">{entropyLevel !== null ? entropyLevel.toFixed(2) : 'N/A'}</div>
+                <div className="text-xs text-gray-500">{entropyOk ? '✓ < 0.4' : '⚠ Must be < 0.4'}</div>
+              </div>
+
+              {/* Coherence */}
+              <div className={`p-2 rounded border ${coherenceOk ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="text-xs font-medium text-gray-600">Coherence Level</div>
+                <div className="text-lg font-bold">{coherenceLevel !== null ? coherenceLevel.toFixed(2) : 'N/A'}</div>
+                <div className="text-xs text-gray-500">{coherenceOk ? '✓ > 0.6' : '⚠ Must be > 0.6'}</div>
+              </div>
+
+              {/* Uncertainty */}
+              <div className={`p-2 rounded border ${uncertaintyOk ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="text-xs font-medium text-gray-600">Uncertainty Acknowledged</div>
+                <div className="text-lg font-bold">{uncertaintyAcknowledged !== null ? (uncertaintyAcknowledged ? 'Yes' : 'No') : 'N/A'}</div>
+                <div className="text-xs text-gray-500">{uncertaintyOk ? '✓ Acknowledged' : '⚠ Must acknowledge'}</div>
+              </div>
+
+              {/* Transparency */}
+              <div className={`p-2 rounded border ${transparencyOk ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="text-xs font-medium text-gray-600">Reasoning Transparency</div>
+                <div className="text-lg font-bold">{reasoningTransparency !== null ? reasoningTransparency.toFixed(2) : 'N/A'}</div>
+                <div className="text-xs text-gray-500">{transparencyOk ? '✓ Maintained' : '⚠ Must maintain'}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Other fields under "View details" */}
+          {otherFields.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-gray-600 hover:bg-gray-100 px-2 py-1 rounded text-xs">
+                📋 View details ({otherFields.length} more fields)
+              </summary>
+              <div className="ml-2 mt-2 space-y-1 border-l-2 border-gray-300 pl-2">
+                {otherFields.map(field => (
+                  <div key={field} className="py-1">
+                    <span className="text-blue-600 font-medium text-xs mr-2">{field}:</span>
+                    {renderExpandableData(data[field], 2)}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      );
+    }
+
     // Define key fields to show for each stage type
     const keyFieldsMap: Record<string, string[]> = {
       'thought_start': ['task_description', 'thought_content'],
       'snapshot_and_context': ['context', 'system_snapshot'],
-      'conscience_result': ['conscience_decision', 'conscience_reasoning', 'conscience_score'],
       'action_result': ['action_executed', 'action_result', 'action_output']
     };
 
