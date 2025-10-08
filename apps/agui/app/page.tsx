@@ -503,7 +503,17 @@ export default function InteractPage() {
             <div key={field} className="py-1">
               <div className="text-blue-600 font-semibold mb-1">{field.replace(/_/g, ' ')}:</div>
               <div className="ml-2">
-                {typeof value === 'string' && value.length > 200 ? (
+                {/* Special handling for system_snapshot - expand directly */}
+                {field === 'system_snapshot' && typeof value === 'object' ? (
+                  <div className="space-y-1 border-l-2 border-gray-300 pl-2">
+                    {Object.entries(value).map(([key, val]) => (
+                      <div key={key} className="py-1">
+                        <span className="text-blue-600 font-medium text-xs mr-2">{key}:</span>
+                        {renderExpandableData(val, 2)}
+                      </div>
+                    ))}
+                  </div>
+                ) : typeof value === 'string' && value.length > 200 ? (
                   <details>
                     <summary className="cursor-pointer text-gray-700 hover:underline">
                       {value.substring(0, 100)}... ({value.length} chars)
