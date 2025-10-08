@@ -915,6 +915,25 @@ export default function InteractPage() {
                                                   })
                                                 : '';
 
+                                              // Helper to get action emoji
+                                              const getActionEmoji = (actionName: string) => {
+                                                const actionEmojis: Record<string, string> = {
+                                                  'SPEAK': '💬', 'speak': '💬',
+                                                  'TOOL': '🔧', 'tool': '🔧',
+                                                  'OBSERVE': '👁️', 'observe': '👁️',
+                                                  'MEMORIZE': '💾', 'memorize': '💾',
+                                                  'RECALL': '🔍', 'recall': '🔍',
+                                                  'FORGET': '🗑️', 'forget': '🗑️',
+                                                  'DEFER': '⏸️', 'defer': '⏸️',
+                                                  'PONDER': '🤔', 'ponder': '🤔',
+                                                  'REJECT': '❌', 'reject': '❌',
+                                                  'TASK_COMPLETE': '✅', 'task_complete': '✅'
+                                                };
+                                                let clean = actionName;
+                                                if (clean?.includes('.')) clean = clean.split('.').pop() || clean;
+                                                return actionEmojis[clean] || actionEmojis[clean?.toUpperCase()] || '⚡';
+                                              };
+
                                               return (
                                                 <details key={stageName} className="bg-green-50 border border-green-200 rounded">
                                                   <summary className="flex items-center p-2 cursor-pointer hover:bg-green-100 rounded text-xs">
@@ -958,6 +977,26 @@ export default function InteractPage() {
                                                             setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'pdma' }));
                                                           }}
                                                         >⚖️</span>
+                                                      </span>
+                                                    )}
+                                                    {/* Show action emoji for ASPDMA */}
+                                                    {stageName === 'aspdma_result' && stage.data.selected_action && (
+                                                      <span className="mr-2" title={`Action: ${stage.data.selected_action}`}>
+                                                        {getActionEmoji(stage.data.selected_action)}
+                                                        {stage.data.is_recursive && <span className="ml-1" title="Recursive">🔁</span>}
+                                                      </span>
+                                                    )}
+                                                    {/* Show conscience status */}
+                                                    {stageName === 'conscience_result' && (
+                                                      <span className="mr-2">
+                                                        {stage.data.conscience_passed ? '✅' : '❌'}
+                                                        {stage.data.is_recursive && <span className="ml-1" title="Recursive">🔁</span>}
+                                                      </span>
+                                                    )}
+                                                    {/* Show action emoji for ACTION RESULT */}
+                                                    {stageName === 'action_result' && stage.data.action_executed && (
+                                                      <span className="mr-2" title={`Executed: ${stage.data.action_executed}`}>
+                                                        {getActionEmoji(stage.data.action_executed)}
                                                       </span>
                                                     )}
                                                     <span className="text-green-600">✓</span>
@@ -1025,6 +1064,25 @@ export default function InteractPage() {
                                             })
                                           : '';
 
+                                        // Helper to get action emoji
+                                        const getActionEmoji = (actionName: string) => {
+                                          const actionEmojis: Record<string, string> = {
+                                            'SPEAK': '💬', 'speak': '💬',
+                                            'TOOL': '🔧', 'tool': '🔧',
+                                            'OBSERVE': '👁️', 'observe': '👁️',
+                                            'MEMORIZE': '💾', 'memorize': '💾',
+                                            'RECALL': '🔍', 'recall': '🔍',
+                                            'FORGET': '🗑️', 'forget': '🗑️',
+                                            'DEFER': '⏸️', 'defer': '⏸️',
+                                            'PONDER': '🤔', 'ponder': '🤔',
+                                            'REJECT': '❌', 'reject': '❌',
+                                            'TASK_COMPLETE': '✅', 'task_complete': '✅'
+                                          };
+                                          let clean = actionName;
+                                          if (clean?.includes('.')) clean = clean.split('.').pop() || clean;
+                                          return actionEmojis[clean] || actionEmojis[clean?.toUpperCase()] || '⚡';
+                                        };
+
                                         return (
                                           <details key={stageName} className="bg-green-50 border border-green-200 rounded">
                                             <summary className="flex items-center p-2 cursor-pointer hover:bg-green-100 rounded text-xs">
@@ -1068,6 +1126,26 @@ export default function InteractPage() {
                                                       setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'pdma' }));
                                                     }}
                                                   >⚖️</span>
+                                                </span>
+                                              )}
+                                              {/* Show action emoji for ASPDMA */}
+                                              {stageName === 'aspdma_result' && stage.data.selected_action && (
+                                                <span className="mr-2" title={`Action: ${stage.data.selected_action}`}>
+                                                  {getActionEmoji(stage.data.selected_action)}
+                                                  {stage.data.is_recursive && <span className="ml-1" title="Recursive">🔁</span>}
+                                                </span>
+                                              )}
+                                              {/* Show conscience status */}
+                                              {stageName === 'conscience_result' && (
+                                                <span className="mr-2">
+                                                  {stage.data.conscience_passed ? '✅' : '❌'}
+                                                  {stage.data.is_recursive && <span className="ml-1" title="Recursive">🔁</span>}
+                                                </span>
+                                              )}
+                                              {/* Show action emoji for ACTION RESULT */}
+                                              {stageName === 'action_result' && stage.data.action_executed && (
+                                                <span className="mr-2" title={`Executed: ${stage.data.action_executed}`}>
+                                                  {getActionEmoji(stage.data.action_executed)}
                                                 </span>
                                               )}
                                               <span className="text-green-600">✓</span>
