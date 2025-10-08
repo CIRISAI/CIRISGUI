@@ -268,6 +268,29 @@ export default function InteractPage() {
     return index >= 0 ? `${index + 1}` : '?';
   };
 
+  // Get action text label
+  const getActionLabel = (actionName: string): string => {
+    let clean = actionName;
+    if (clean?.includes('.')) clean = clean.split('.').pop() || clean;
+    return clean.toUpperCase();
+  };
+
+  // Check if action is exempt from conscience
+  const isConscienceExempt = (actionName: string): boolean => {
+    const exemptActions = ['TASK_COMPLETE', 'DEFER', 'REJECT', 'OBSERVE', 'RECALL'];
+    let clean = actionName;
+    if (clean?.includes('.')) clean = clean.split('.').pop() || clean;
+    return exemptActions.includes(clean.toUpperCase());
+  };
+
+  // Get conscience status text
+  const getConscienceStatus = (consciencePassed: boolean, selectedAction: string): string => {
+    if (isConscienceExempt(selectedAction)) {
+      return 'EXEMPT';
+    }
+    return consciencePassed ? 'PASSED' : 'FAILED';
+  };
+
   // DMA Results Selector Component
   const DMAResultsSelector: React.FC<{
     data: any;
@@ -277,9 +300,9 @@ export default function InteractPage() {
     const [selectedDMA, setSelectedDMA] = useState<'csdma' | 'dsdma' | 'pdma'>(initialSelected);
 
     const dmaTypes = [
-      { key: 'csdma', label: 'Common Sense', icon: '🧠', field: 'csdma' },
-      { key: 'dsdma', label: 'Domain Specific', icon: '🎯', field: 'dsdma' },
-      { key: 'pdma', label: 'Ethical', icon: '⚖️', field: 'pdma' }
+      { key: 'csdma', label: 'Common Sense', icon: 'CS', field: 'csdma' },
+      { key: 'dsdma', label: 'Domain Specific', icon: 'DS', field: 'dsdma' },
+      { key: 'pdma', label: 'Ethical', icon: 'E', field: 'pdma' }
     ];
 
     const otherFields = Object.keys(data).filter(
@@ -300,7 +323,7 @@ export default function InteractPage() {
                   : 'border-gray-300 hover:border-gray-400 bg-white'
               }`}
             >
-              <div className="text-2xl mb-1">{dma.icon}</div>
+              <div className="text-xl font-bold mb-1 text-blue-600">{dma.icon}</div>
               <div className="text-xs font-medium text-center">{dma.label}</div>
             </button>
           ))}
@@ -440,30 +463,13 @@ export default function InteractPage() {
 
     // Special rendering for aspdma_result
     if (stageName === 'aspdma_result') {
-      const actionEmojis: Record<string, string> = {
-        // Action Handler
-        'SPEAK': '💬',
-        'TOOL': '🔧',
-        'OBSERVE': '👁️',
-        // Memory Handler
-        'MEMORIZE': '💾',
-        'RECALL': '🔍',
-        'FORGET': '🗑️',
-        // Deferral Handler
-        'DEFER': '⏸️',
-        'PONDER': '🤔',
-        'REJECT': '❌',
-        // Completion
-        'TASK_COMPLETE': '✅'
-      };
-
       // Extract action name, removing "HandlerActionType." prefix if present
       let selectedAction = data.selected_action || 'UNKNOWN';
       if (selectedAction.includes('.')) {
         selectedAction = selectedAction.split('.').pop() || selectedAction;
       }
 
-      const actionEmoji = actionEmojis[selectedAction] || '❓';
+      const actionLabel = getActionLabel(selectedAction);
       const actionReasoning = data.action_rationale || data.action_reasoning || '';
 
       const otherFields = Object.keys(data).filter(
@@ -474,10 +480,7 @@ export default function InteractPage() {
         <div className="space-y-3">
           {/* Selected Action */}
           <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="text-4xl">{actionEmoji}</div>
-            <div className="flex-1">
-              <div className="text-blue-900 font-bold text-lg">{selectedAction}</div>
-            </div>
+            <div className="text-blue-900 font-bold text-2xl">{actionLabel}</div>
           </div>
 
           {/* Action Reasoning */}
@@ -513,6 +516,15 @@ export default function InteractPage() {
       const consciencePassed = data.conscience_passed;
       const epistemicData = data.epistemic_data || {};
       const overrideReason = data.conscience_override_reason;
+      const selectedAction = data.selected_action || '';
+
+      // Determine status: PASSED, FAILED, or EXEMPT
+      const conscienceStatus = selectedAction
+        ? getConscienceStatus(consciencePassed, selectedAction)
+        : (consciencePassed ? 'PASSED' : 'FAILED');
+
+      const isExempt = conscienceStatus === 'EXEMPT';
+      const isPassed = conscienceStatus === 'PASSED';
 
       const entropyLevel = epistemicData.entropy_level ?? null;
       const coherenceLevel = epistemicData.coherence_level ?? null;
@@ -526,19 +538,22 @@ export default function InteractPage() {
       const transparencyOk = reasoningTransparency === 1;
 
       const otherFields = Object.keys(data).filter(
-        key => !['conscience_passed', 'epistemic_data', 'conscience_override_reason'].includes(key)
+        key => !['conscience_passed', 'epistemic_data', 'conscience_override_reason', 'selected_action'].includes(key)
       );
 
       return (
         <div className="space-y-3">
           {/* Conscience Status */}
           <div className={`flex items-center gap-3 border rounded-lg p-3 ${
-            consciencePassed ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+            isExempt ? 'bg-gray-50 border-gray-300' :
+            isPassed ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
           }`}>
-            <div className="text-4xl">{consciencePassed ? '✅' : '❌'}</div>
             <div className="flex-1">
-              <div className={`font-bold text-lg ${consciencePassed ? 'text-green-900' : 'text-red-900'}`}>
-                {consciencePassed ? 'PASSED' : 'FAILED'}
+              <div className={`font-bold text-2xl ${
+                isExempt ? 'text-gray-700' :
+                isPassed ? 'text-green-900' : 'text-red-900'
+              }`}>
+                {conscienceStatus}
               </div>
               {overrideReason && (
                 <div className="text-sm text-gray-700 mt-1">Override: {overrideReason}</div>
@@ -602,26 +617,12 @@ export default function InteractPage() {
 
     // Special rendering for action_result
     if (stageName === 'action_result') {
-      const actionEmojis: Record<string, string> = {
-        'SPEAK': '💬', 'speak': '💬',
-        'TOOL': '🔧', 'tool': '🔧',
-        'OBSERVE': '👁️', 'observe': '👁️',
-        'MEMORIZE': '💾', 'memorize': '💾',
-        'RECALL': '🔍', 'recall': '🔍',
-        'FORGET': '🗑️', 'forget': '🗑️',
-        'DEFER': '⏸️', 'defer': '⏸️',
-        'PONDER': '🤔', 'ponder': '🤔',
-        'REJECT': '❌', 'reject': '❌',
-        'TASK_COMPLETE': '✅', 'task_complete': '✅'
-      };
-
       let actionExecuted = data.action_executed || 'UNKNOWN';
       if (actionExecuted.includes('.')) {
         actionExecuted = actionExecuted.split('.').pop() || actionExecuted;
       }
-      const actionUpper = actionExecuted.toUpperCase();
+      const actionLabel = getActionLabel(actionExecuted);
 
-      const actionEmoji = actionEmojis[actionExecuted] || actionEmojis[actionUpper] || '⚡';
       const executionSuccess = data.execution_success ?? null;
       const auditHash = data.audit_entry_hash || '';
       const hashEnd = auditHash ? auditHash.slice(-8) : '';
@@ -636,12 +637,11 @@ export default function InteractPage() {
           <div className={`flex items-center gap-3 border rounded-lg p-3 ${
             executionSuccess ? 'bg-green-50 border-green-200' : executionSuccess === false ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
           }`}>
-            <div className="text-4xl">{actionEmoji}</div>
             <div className="flex-1">
-              <div className={`font-bold text-lg ${
+              <div className={`font-bold text-2xl ${
                 executionSuccess ? 'text-green-900' : executionSuccess === false ? 'text-red-900' : 'text-gray-900'
               }`}>
-                {actionUpper}
+                {actionLabel}
               </div>
               {executionSuccess !== null && (
                 <div className="text-xs text-gray-600 mt-1">
@@ -961,24 +961,6 @@ export default function InteractPage() {
                                                   })
                                                 : '';
 
-                                              // Helper to get action emoji
-                                              const getActionEmoji = (actionName: string) => {
-                                                const actionEmojis: Record<string, string> = {
-                                                  'SPEAK': '💬', 'speak': '💬',
-                                                  'TOOL': '🔧', 'tool': '🔧',
-                                                  'OBSERVE': '👁️', 'observe': '👁️',
-                                                  'MEMORIZE': '💾', 'memorize': '💾',
-                                                  'RECALL': '🔍', 'recall': '🔍',
-                                                  'FORGET': '🗑️', 'forget': '🗑️',
-                                                  'DEFER': '⏸️', 'defer': '⏸️',
-                                                  'PONDER': '🤔', 'ponder': '🤔',
-                                                  'REJECT': '❌', 'reject': '❌',
-                                                  'TASK_COMPLETE': '✅', 'task_complete': '✅'
-                                                };
-                                                let clean = actionName;
-                                                if (clean?.includes('.')) clean = clean.split('.').pop() || clean;
-                                                return actionEmojis[clean] || actionEmojis[clean?.toUpperCase()] || '⚡';
-                                              };
 
                                               return (
                                                 <details key={stageName} className="bg-green-50 border border-green-200 rounded">
@@ -995,7 +977,7 @@ export default function InteractPage() {
                                                       <span className="flex gap-1 mr-2">
                                                         <span
                                                           title="Common Sense DMA"
-                                                          className="cursor-pointer hover:scale-110 transition-transform"
+                                                          className="cursor-pointer hover:bg-green-200 transition-colors px-1.5 py-0.5 rounded text-xs font-bold"
                                                           onClick={(e) => {
                                                             const details = e.currentTarget.closest('details');
                                                             if (details?.open) {
@@ -1005,10 +987,10 @@ export default function InteractPage() {
                                                             // Let it expand naturally if closed
                                                             setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'csdma' }));
                                                           }}
-                                                        >🧠</span>
+                                                        >CS</span>
                                                         <span
                                                           title="Domain Specific DMA"
-                                                          className="cursor-pointer hover:scale-110 transition-transform"
+                                                          className="cursor-pointer hover:bg-green-200 transition-colors px-1.5 py-0.5 rounded text-xs font-bold"
                                                           onClick={(e) => {
                                                             const details = e.currentTarget.closest('details');
                                                             if (details?.open) {
@@ -1018,10 +1000,10 @@ export default function InteractPage() {
                                                             // Let it expand naturally if closed
                                                             setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'dsdma' }));
                                                           }}
-                                                        >🎯</span>
+                                                        >DS</span>
                                                         <span
                                                           title="Ethical DMA"
-                                                          className="cursor-pointer hover:scale-110 transition-transform"
+                                                          className="cursor-pointer hover:bg-green-200 transition-colors px-1.5 py-0.5 rounded text-xs font-bold"
                                                           onClick={(e) => {
                                                             const details = e.currentTarget.closest('details');
                                                             if (details?.open) {
@@ -1031,27 +1013,33 @@ export default function InteractPage() {
                                                             // Let it expand naturally if closed
                                                             setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'pdma' }));
                                                           }}
-                                                        >⚖️</span>
+                                                        >E</span>
                                                       </span>
                                                     )}
-                                                    {/* Show action emoji for ASPDMA */}
+                                                    {/* Show action label for ASPDMA */}
                                                     {stageName === 'aspdma_result' && stage.data.selected_action && (
-                                                      <span className="mr-2" title={`Action: ${stage.data.selected_action}`}>
-                                                        {getActionEmoji(stage.data.selected_action)}
+                                                      <span className="mr-2 px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-bold" title={`Action: ${stage.data.selected_action}`}>
+                                                        {getActionLabel(stage.data.selected_action)}
                                                         {stage.data.is_recursive && <span className="ml-1" title="Recursive">🔁</span>}
                                                       </span>
                                                     )}
                                                     {/* Show conscience status */}
                                                     {stageName === 'conscience_result' && (
-                                                      <span className="mr-2">
-                                                        {stage.data.conscience_passed ? '✅' : '❌'}
+                                                      <span className={`mr-2 px-1.5 py-0.5 rounded text-xs font-bold ${
+                                                        getConscienceStatus(stage.data.conscience_passed, stage.data.selected_action || '') === 'EXEMPT'
+                                                          ? 'bg-gray-100 text-gray-700'
+                                                          : stage.data.conscience_passed
+                                                            ? 'bg-green-100 text-green-800'
+                                                            : 'bg-red-100 text-red-800'
+                                                      }`}>
+                                                        {getConscienceStatus(stage.data.conscience_passed, stage.data.selected_action || '')}
                                                         {stage.data.is_recursive && <span className="ml-1" title="Recursive">🔁</span>}
                                                       </span>
                                                     )}
-                                                    {/* Show action emoji for ACTION RESULT */}
+                                                    {/* Show action label for ACTION RESULT */}
                                                     {stageName === 'action_result' && stage.data.action_executed && (
-                                                      <span className="mr-2" title={`Executed: ${stage.data.action_executed}`}>
-                                                        {getActionEmoji(stage.data.action_executed)}
+                                                      <span className="mr-2 px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-bold" title={`Executed: ${stage.data.action_executed}`}>
+                                                        {getActionLabel(stage.data.action_executed)}
                                                       </span>
                                                     )}
                                                     <span className="text-green-600">✓</span>
@@ -1140,24 +1128,6 @@ export default function InteractPage() {
                                             })
                                           : '';
 
-                                        // Helper to get action emoji
-                                        const getActionEmoji = (actionName: string) => {
-                                          const actionEmojis: Record<string, string> = {
-                                            'SPEAK': '💬', 'speak': '💬',
-                                            'TOOL': '🔧', 'tool': '🔧',
-                                            'OBSERVE': '👁️', 'observe': '👁️',
-                                            'MEMORIZE': '💾', 'memorize': '💾',
-                                            'RECALL': '🔍', 'recall': '🔍',
-                                            'FORGET': '🗑️', 'forget': '🗑️',
-                                            'DEFER': '⏸️', 'defer': '⏸️',
-                                            'PONDER': '🤔', 'ponder': '🤔',
-                                            'REJECT': '❌', 'reject': '❌',
-                                            'TASK_COMPLETE': '✅', 'task_complete': '✅'
-                                          };
-                                          let clean = actionName;
-                                          if (clean?.includes('.')) clean = clean.split('.').pop() || clean;
-                                          return actionEmojis[clean] || actionEmojis[clean?.toUpperCase()] || '⚡';
-                                        };
 
                                         return (
                                           <details key={stageName} className="bg-green-50 border border-green-200 rounded">
@@ -1174,7 +1144,7 @@ export default function InteractPage() {
                                                 <span className="flex gap-1 mr-2">
                                                   <span
                                                     title="Common Sense DMA"
-                                                    className="cursor-pointer hover:scale-110 transition-transform"
+                                                    className="cursor-pointer hover:bg-green-200 transition-colors px-1.5 py-0.5 rounded text-xs font-bold"
                                                     onClick={(e) => {
                                                       const details = e.currentTarget.closest('details');
                                                       if (details?.open) {
@@ -1184,10 +1154,10 @@ export default function InteractPage() {
                                                       // Let it expand naturally if closed
                                                       setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'csdma' }));
                                                     }}
-                                                  >🧠</span>
+                                                  >CS</span>
                                                   <span
                                                     title="Domain Specific DMA"
-                                                    className="cursor-pointer hover:scale-110 transition-transform"
+                                                    className="cursor-pointer hover:bg-green-200 transition-colors px-1.5 py-0.5 rounded text-xs font-bold"
                                                     onClick={(e) => {
                                                       const details = e.currentTarget.closest('details');
                                                       if (details?.open) {
@@ -1197,10 +1167,10 @@ export default function InteractPage() {
                                                       // Let it expand naturally if closed
                                                       setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'dsdma' }));
                                                     }}
-                                                  >🎯</span>
+                                                  >DS</span>
                                                   <span
                                                     title="Ethical DMA"
-                                                    className="cursor-pointer hover:scale-110 transition-transform"
+                                                    className="cursor-pointer hover:bg-green-200 transition-colors px-1.5 py-0.5 rounded text-xs font-bold"
                                                     onClick={(e) => {
                                                       const details = e.currentTarget.closest('details');
                                                       if (details?.open) {
@@ -1210,27 +1180,33 @@ export default function InteractPage() {
                                                       // Let it expand naturally if closed
                                                       setSelectedDMAs(prev => ({ ...prev, [`thought-${thought.thoughtId}-dma`]: 'pdma' }));
                                                     }}
-                                                  >⚖️</span>
+                                                  >E</span>
                                                 </span>
                                               )}
-                                              {/* Show action emoji for ASPDMA */}
+                                              {/* Show action label for ASPDMA */}
                                               {stageName === 'aspdma_result' && stage.data.selected_action && (
-                                                <span className="mr-2" title={`Action: ${stage.data.selected_action}`}>
-                                                  {getActionEmoji(stage.data.selected_action)}
+                                                <span className="mr-2 px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-bold" title={`Action: ${stage.data.selected_action}`}>
+                                                  {getActionLabel(stage.data.selected_action)}
                                                   {stage.data.is_recursive && <span className="ml-1" title="Recursive">🔁</span>}
                                                 </span>
                                               )}
                                               {/* Show conscience status */}
                                               {stageName === 'conscience_result' && (
-                                                <span className="mr-2">
-                                                  {stage.data.conscience_passed ? '✅' : '❌'}
+                                                <span className={`mr-2 px-1.5 py-0.5 rounded text-xs font-bold ${
+                                                  getConscienceStatus(stage.data.conscience_passed, stage.data.selected_action || '') === 'EXEMPT'
+                                                    ? 'bg-gray-100 text-gray-700'
+                                                    : stage.data.conscience_passed
+                                                      ? 'bg-green-100 text-green-800'
+                                                      : 'bg-red-100 text-red-800'
+                                                }`}>
+                                                  {getConscienceStatus(stage.data.conscience_passed, stage.data.selected_action || '')}
                                                   {stage.data.is_recursive && <span className="ml-1" title="Recursive">🔁</span>}
                                                 </span>
                                               )}
-                                              {/* Show action emoji for ACTION RESULT */}
+                                              {/* Show action label for ACTION RESULT */}
                                               {stageName === 'action_result' && stage.data.action_executed && (
-                                                <span className="mr-2" title={`Executed: ${stage.data.action_executed}`}>
-                                                  {getActionEmoji(stage.data.action_executed)}
+                                                <span className="mr-2 px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-bold" title={`Executed: ${stage.data.action_executed}`}>
+                                                  {getActionLabel(stage.data.action_executed)}
                                                 </span>
                                               )}
                                               <span className="text-green-600">✓</span>
