@@ -17,6 +17,8 @@ export default function LoginPage() {
   const [loadingAgents, setLoadingAgents] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [betaAcknowledged, setBetaAcknowledged] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const { login } = useAuth();
 
   // Always show Google and Discord OAuth options
@@ -199,12 +201,16 @@ export default function LoginPage() {
       // Determine OAuth URLs based on deployment mode
       if (agents.length > 1 || agent.container_name !== 'standalone') {
         // Managed mode: use agent-specific paths
-        redirectUri = encodeURIComponent(`${window.location.origin}/oauth/${selectedAgent}/${provider}/callback`);
+        // Include marketing_opt_in parameter in callback URL
+        const callbackUrl = `${window.location.origin}/oauth/${selectedAgent}/${provider}/callback?marketing_opt_in=${marketingOptIn}`;
+        redirectUri = encodeURIComponent(callbackUrl);
         oauthUrl = `${window.location.origin}/api/${agent.agent_id}/v1/auth/oauth/${provider}/login`;
       } else {
         // Standalone mode: direct OAuth - still use dynamic route for consistency
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || window.location.origin;
-        redirectUri = encodeURIComponent(`${window.location.origin}/oauth/${selectedAgent}/${provider}/callback`);
+        // Include marketing_opt_in parameter in callback URL
+        const callbackUrl = `${window.location.origin}/oauth/${selectedAgent}/${provider}/callback?marketing_opt_in=${marketingOptIn}`;
+        redirectUri = encodeURIComponent(callbackUrl);
         oauthUrl = `${apiBaseUrl}/v1/auth/oauth/${provider}/login`;
       }
 
@@ -240,7 +246,9 @@ export default function LoginPage() {
   const handleManagerGoogleLogin = async () => {
     try {
       // Redirect to Manager OAuth endpoint through nginx proxy
-      const redirectUri = encodeURIComponent(`${window.location.origin}/manager/callback`);
+      // Include marketing_opt_in parameter in callback URL
+      const callbackUrl = `${window.location.origin}/manager/callback?marketing_opt_in=${marketingOptIn}`;
+      const redirectUri = encodeURIComponent(callbackUrl);
       // Always use the nginx proxy path
       const managerUrl = `${window.location.origin}/manager/v1/oauth/login`;
       window.location.href = `${managerUrl}?redirect_uri=${redirectUri}`;
@@ -324,6 +332,53 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Terms and Consent Checkboxes */}
+          <div className="space-y-4">
+            {/* Beta Acknowledgment - Required */}
+            <div className="relative flex items-start">
+              <div className="flex items-center h-5">
+                <input
+                  id="beta-acknowledgment"
+                  name="beta-acknowledgment"
+                  type="checkbox"
+                  checked={betaAcknowledged}
+                  onChange={(e) => setBetaAcknowledged(e.target.checked)}
+                  className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer"
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="beta-acknowledgment" className="font-medium text-gray-700 cursor-pointer">
+                  <span className="text-red-600">*</span> Beta System Acknowledgment
+                </label>
+                <p className="text-gray-500 text-xs mt-1">
+                  By checking this box you recognize this is a beta system being provided for evaluation purposes only. No sensitive or private data should be entered. All local and international laws apply. Usage restricted to adults and prohibited in countries sanctioned by the USA.
+                </p>
+              </div>
+            </div>
+
+            {/* Marketing Opt-In - Optional */}
+            <div className="relative flex items-start">
+              <div className="flex items-center h-5">
+                <input
+                  id="marketing-opt-in"
+                  name="marketing-opt-in"
+                  type="checkbox"
+                  checked={marketingOptIn}
+                  onChange={(e) => setMarketingOptIn(e.target.checked)}
+                  className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded cursor-pointer"
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="marketing-opt-in" className="font-medium text-gray-700 cursor-pointer">
+                  Marketing Communications
+                </label>
+                <p className="text-gray-500 text-xs mt-1">
+                  Check this box to opt in to receiving marketing materials from CIRIS L3C.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Basic Auth Login Form - Show for local development */}
           {agents.length > 0 && agents[0].container_name === 'standalone' && (
             <form onSubmit={handleBasicLogin} className="space-y-4">
@@ -363,7 +418,7 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading || !username || !password}
+                disabled={loading || !username || !password || !betaAcknowledged}
                 className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Signing in...' : 'Sign in'}
@@ -399,7 +454,7 @@ export default function LoginPage() {
                   key={provider.provider}
                   type="button"
                   onClick={() => handleOAuthLogin(provider.provider)}
-                  disabled={agents.length === 0}
+                  disabled={agents.length === 0 || !betaAcknowledged}
                   className="w-full inline-flex justify-center items-center py-2.5 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   <span className="mr-2">
                     {getProviderIcon(provider.provider)}
