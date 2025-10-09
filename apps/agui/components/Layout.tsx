@@ -52,6 +52,7 @@ function Navbar({ className }: { className?: string }) {
   ];
   const accountNavigation = [
     { name: "Account Settings", href: "/account", minRole: "OBSERVER" },
+    { name: "Settings", href: "/account/settings", minRole: "OBSERVER" },
     { name: "Consent Management", href: "/account/consent", minRole: "OBSERVER" },
     { name: "Privacy Settings", href: "/account/privacy", minRole: "OBSERVER" },
     { name: "API Keys", href: "/account/api-keys", minRole: "OBSERVER" },

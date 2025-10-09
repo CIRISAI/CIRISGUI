@@ -116,6 +116,21 @@ export interface PermissionGrantRequest {
   permissions: string[];
 }
 
+export interface UserSettingsResponse {
+  user_preferred_name?: string;
+  location?: string;
+  interaction_preferences?: string;
+  marketing_opt_in: boolean;
+  marketing_opt_in_source?: string;
+}
+
+export interface UpdateUserSettingsRequest {
+  user_preferred_name?: string;
+  location?: string;
+  interaction_preferences?: string;
+  marketing_opt_in?: boolean;
+}
+
 export class UsersResource extends BaseResource {
   /**
    * List all users with optional filtering
@@ -235,5 +250,21 @@ export class UsersResource extends BaseResource {
    */
   async unlinkOAuthAccount(userId: string, provider: string, externalId: string): Promise<UserDetail> {
     return this.transport.delete<UserDetail>(`/v1/users/${userId}/oauth-links/${provider}/${externalId}`);
+  }
+
+  /**
+   * Get the current user's personal settings
+   * Requires: Must be authenticated (any role)
+   */
+  async getMySettings(): Promise<UserSettingsResponse> {
+    return this.transport.get<UserSettingsResponse>('/v1/users/me/settings');
+  }
+
+  /**
+   * Update the current user's personal settings
+   * Requires: Must be authenticated (any role)
+   */
+  async updateMySettings(data: UpdateUserSettingsRequest): Promise<UserSettingsResponse> {
+    return this.transport.put<UserSettingsResponse>('/v1/users/me/settings', data);
   }
 }
