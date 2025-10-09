@@ -187,6 +187,35 @@ export class AuthResource extends BaseResource {
       throw new CIRISAuthError(this.buildErrorMessage('OAuth callback', (error as Error).message));
     }
   }
+
+  // API Key Management
+
+  /**
+   * Create a new API key for the authenticated user
+   * @param description Description for the API key
+   * @param expiresInMinutes Expiry time in minutes (30-10080, i.e. 30 min to 7 days)
+   */
+  async createAPIKey(description: string, expiresInMinutes: number): Promise<APIKeyResponse> {
+    return this.transport.post<APIKeyResponse>('/v1/auth/api-keys', {
+      description,
+      expires_in_minutes: expiresInMinutes
+    });
+  }
+
+  /**
+   * List all API keys for the authenticated user
+   */
+  async listAPIKeys(): Promise<APIKeyListResponse> {
+    return this.transport.get<APIKeyListResponse>('/v1/auth/api-keys');
+  }
+
+  /**
+   * Delete/revoke an API key
+   * @param keyId The key identifier to delete
+   */
+  async deleteAPIKey(keyId: string): Promise<void> {
+    return this.transport.delete(`/v1/auth/api-keys/${keyId}`);
+  }
 }
 
 // OAuth types
@@ -211,4 +240,30 @@ export interface OAuthProviderConfig {
 export interface OAuthLoginResponse {
   authorization_url: string;
   state: string;
+}
+
+// API Key types
+export interface APIKeyResponse {
+  api_key: string;
+  role: string;
+  expires_at: string;
+  description: string;
+  created_at: string;
+  created_by: string;
+}
+
+export interface APIKeyInfo {
+  key_id: string;
+  role: string;
+  expires_at: string;
+  description: string;
+  created_at: string;
+  created_by: string;
+  last_used?: string;
+  is_active: boolean;
+}
+
+export interface APIKeyListResponse {
+  api_keys: APIKeyInfo[];
+  total: number;
 }
