@@ -50,6 +50,39 @@ function Navbar({ className }: { className?: string }) {
     { name: "Audit", href: "/audit", minRole: "ADMIN" },
     { name: "Logs", href: "/logs", minRole: "ADMIN" },
   ];
+
+  const handleShutdown = async (force: boolean = false) => {
+    const actionType = force ? "Force Shutdown" : "Graceful Shutdown";
+    const confirmMessage = force
+      ? "Are you sure you want to FORCE SHUTDOWN the system? This will immediately terminate all operations."
+      : "Are you sure you want to shut down the system gracefully? All active processes will be completed first.";
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    const reason = prompt(`Please provide a reason for ${actionType.toLowerCase()}:`);
+    if (!reason) {
+      alert("Shutdown cancelled: Reason is required");
+      return;
+    }
+
+    try {
+      const { CIRISClient } = await import('@/lib/ciris-sdk');
+      const client = new CIRISClient();
+      const response = await client.system.shutdown(reason, true, force);
+
+      alert(response.message || `${actionType} initiated successfully`);
+
+      // Redirect to login after a brief delay
+      setTimeout(() => {
+        logout();
+        router.push('/login');
+      }, 2000);
+    } catch (error: any) {
+      alert(`${actionType} failed: ${error.message || 'Unknown error'}`);
+    }
+  };
   const accountNavigation = [
     { name: "Account Settings", href: "/account", minRole: "OBSERVER" },
     { name: "Settings", href: "/account/settings", minRole: "OBSERVER" },
@@ -132,6 +165,18 @@ function Navbar({ className }: { className?: string }) {
                   {item.name}
                 </Link>
               ))}
+              <div className="border-t border-gray-300 pt-2 space-y-2">
+                <button
+                  onClick={() => handleShutdown(false)}
+                  className="border-transparent text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50 inline-flex items-center px-1 pt-1 text-sm font-medium text-left w-full rounded">
+                  Graceful Shutdown
+                </button>
+                <button
+                  onClick={() => handleShutdown(true)}
+                  className="border-transparent text-red-600 hover:text-red-800 hover:bg-red-50 inline-flex items-center px-1 pt-1 text-sm font-medium text-left w-full rounded">
+                  Force Shutdown
+                </button>
+              </div>
             </div>
           </MenuItem>
         )}
