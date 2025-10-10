@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cirisClient } from '@/lib/ciris-sdk/client';
 import toast from 'react-hot-toast';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { calculateWaterUsage, formatWaterUsage, formatCarbonEmissions, WATER_CALCULATION_EXPLANATION } from '@/lib/environmental-impact';
 
 export default function InteractPage() {
   const { user, hasRole } = useAuth();
@@ -627,8 +628,24 @@ export default function InteractPage() {
       const auditHash = data.audit_entry_hash || '';
       const hashEnd = auditHash ? auditHash.slice(-8) : '';
 
+      // Environmental impact fields
+      const tokensTotal = data.tokens_total ?? null;
+      const tokensInput = data.tokens_input ?? null;
+      const tokensOutput = data.tokens_output ?? null;
+      const carbonGrams = data.carbon_grams ?? null;
+      const energyMwh = data.energy_mwh ?? null;
+
+      // Calculate water usage if we have the necessary data
+      let waterMl = null;
+      if (energyMwh !== null && tokensTotal !== null) {
+        const energyKwh = energyMwh / 1000; // Convert mWh to kWh
+        waterMl = calculateWaterUsage(energyKwh, tokensTotal);
+      }
+
+      const hasEnvironmentalData = carbonGrams !== null || waterMl !== null;
+
       const otherFields = Object.keys(data).filter(
-        key => !['action_executed', 'execution_success', 'audit_entry_hash'].includes(key)
+        key => !['action_executed', 'execution_success', 'audit_entry_hash', 'tokens_total', 'tokens_input', 'tokens_output', 'carbon_grams', 'energy_mwh', 'cost_cents'].includes(key)
       );
 
       return (
@@ -651,11 +668,42 @@ export default function InteractPage() {
             </div>
           </div>
 
+          {/* Environmental Impact */}
+          {hasEnvironmentalData && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="text-green-700 font-semibold text-sm mb-2">Environmental Impact</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {carbonGrams !== null && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Carbon:</span>
+                    <span className="font-mono font-medium">{formatCarbonEmissions(carbonGrams)}</span>
+                  </div>
+                )}
+                {waterMl !== null && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Water:</span>
+                    <span className="font-mono font-medium">{formatWaterUsage(waterMl)}</span>
+                  </div>
+                )}
+              </div>
+              {tokensTotal !== null && (
+                <div className="mt-2 pt-2 border-t border-green-200 text-xs text-gray-600">
+                  {tokensInput !== null && tokensOutput !== null && (
+                    <span>{tokensTotal.toLocaleString()} tokens ({tokensInput.toLocaleString()} in, {tokensOutput.toLocaleString()} out)</span>
+                  )}
+                  {(tokensInput === null || tokensOutput === null) && (
+                    <span>{tokensTotal.toLocaleString()} tokens</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Audit Hash */}
           {auditHash && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <div className="flex items-center gap-2">
-                <div className="text-blue-600 font-semibold text-sm">📋 HASH TABLE ENTRY</div>
+                <div className="text-blue-600 font-semibold text-sm">HASH TABLE ENTRY</div>
                 <div className="font-mono text-xs text-blue-900">...{hashEnd}</div>
               </div>
             </div>
@@ -665,7 +713,7 @@ export default function InteractPage() {
           {otherFields.length > 0 && (
             <details>
               <summary className="cursor-pointer text-gray-600 hover:bg-gray-100 px-2 py-1 rounded text-xs">
-                📋 View details ({otherFields.length} more fields)
+                View details ({otherFields.length} more fields)
               </summary>
               <div className="ml-2 mt-2 space-y-1 border-l-2 border-gray-300 pl-2">
                 {otherFields.map(field => (
@@ -1401,6 +1449,45 @@ export default function InteractPage() {
                       Loading pipeline visualization...
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* Environmental Impact Explanation */}
+            <div className="bg-white shadow rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Environmental Impact Calculation</h3>
+                <div className="text-sm text-gray-600 space-y-3 prose prose-sm max-w-none">
+                  <p>
+                    Water consumption is estimated using a hybrid approach combining two peer-reviewed methodologies:
+                  </p>
+                  <ol className="list-decimal list-inside space-y-2 ml-2">
+                    <li>
+                      <strong>WUE-Based Calculation:</strong> Uses Water Usage Effectiveness (WUE) metrics for Illinois-hosted data centers.
+                      We assume 1.5 L/kWh based on Midwest climate conditions and evaporative cooling systems (between industry
+                      average of 1.8 L/kWh and best-in-class of 0.3 L/kWh).
+                    </li>
+                    <li>
+                      <strong>Per-Token Estimation:</strong> Based on a November 2024 study published in <em>Nature Scientific Reports</em> examining
+                      Meta's Llama-3-70B model, which found approximately 0.4 ml of water consumption per token (including both
+                      operational and embodied environmental footprints). This is adjusted proportionally for the Llama-4-Maverick-17B
+                      model (17B/70B = ~0.097 ml/token).
+                    </li>
+                  </ol>
+                  <p>
+                    The final estimate is the average of both methods to provide a defensible, conservative estimate. Water usage
+                    includes both direct cooling water consumption and indirect water footprint from electricity generation.
+                  </p>
+                  <p>
+                    <strong>Carbon Emissions:</strong> Calculated based on the energy consumption of the inference request and the carbon intensity
+                    of the electrical grid serving the data center.
+                  </p>
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-xs text-gray-500">
+                      <strong>Data Sources:</strong> Nature Scientific Reports (2024): "Reconciling the contrasting narratives on the environmental impact of large language models";
+                      ISO/IEC 30134-9 WUE Standard; Regional data center efficiency benchmarks (AWS, Microsoft, Equinix)
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
