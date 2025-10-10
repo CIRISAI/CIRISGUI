@@ -347,11 +347,19 @@ export class Transport {
       url = new URL(path);
     } else {
       // Path is relative, combine with baseURL
-      // Remove leading slash from path to ensure proper concatenation
-      const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-      // Ensure baseURL ends with / for proper URL construction
-      const base = this.baseURL.endsWith('/') ? this.baseURL : this.baseURL + '/';
-      url = new URL(cleanPath, base);
+      // Handle empty baseURL (relative paths in production)
+      if (!this.baseURL || this.baseURL === '') {
+        // Use current origin for constructing URL
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080';
+        const cleanPath = path.startsWith('/') ? path : '/' + path;
+        url = new URL(cleanPath, origin);
+      } else {
+        // Remove leading slash from path to ensure proper concatenation
+        const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+        // Ensure baseURL ends with / for proper URL construction
+        const base = this.baseURL.endsWith('/') ? this.baseURL : this.baseURL + '/';
+        url = new URL(cleanPath, base);
+      }
     }
 
     if (params) {
