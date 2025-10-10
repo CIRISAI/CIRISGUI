@@ -292,6 +292,43 @@ export default function InteractPage() {
     return consciencePassed ? 'PASSED' : 'FAILED';
   };
 
+  // Aggregate environmental impact from all thoughts in a task
+  const aggregateEnvironmentalImpact = (thoughts: Array<any>) => {
+    let totalCarbonGrams = 0;
+    let totalEnergyMwh = 0;
+    let totalTokens = 0;
+    let count = 0;
+
+    thoughts.forEach((thought: any) => {
+      const actionStage = thought.stages.get('action_result');
+      if (actionStage?.data) {
+        const data = actionStage.data;
+        if (data.carbon_grams != null) {
+          totalCarbonGrams += data.carbon_grams;
+          count++;
+        }
+        if (data.energy_mwh != null) {
+          totalEnergyMwh += data.energy_mwh;
+        }
+        if (data.tokens_total != null) {
+          totalTokens += data.tokens_total;
+        }
+      }
+    });
+
+    if (count === 0) return null;
+
+    // Calculate total water usage
+    const energyKwh = totalEnergyMwh / 1000;
+    const waterMl = calculateWaterUsage(energyKwh, totalTokens);
+
+    return {
+      carbonGrams: totalCarbonGrams,
+      waterMl,
+      tokens: totalTokens
+    };
+  };
+
   // DMA Results Selector Component
   const DMAResultsSelector: React.FC<{
     data: any;
@@ -945,12 +982,33 @@ export default function InteractPage() {
                                 <div className="mt-2 ml-4">
                                   <details className="border rounded-lg">
                                     <summary className={`cursor-pointer p-3 ${task.color} text-white rounded-t-lg ${task.completed ? 'opacity-60' : ''}`}>
-                                      <div className="flex justify-between items-center">
-                                        <span className="font-medium text-sm">
-                                          🧠 {task.description || task.taskId.slice(-8)}
-                                          <span className="ml-2 text-xs opacity-75">[Task: {task.taskId}]</span>
-                                        </span>
-                                        <span className="text-xs">{task.thoughts.length} thought(s)</span>
+                                      <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                          <span className="font-medium text-sm">
+                                            🧠 {task.description || task.taskId.slice(-8)}
+                                            <span className="ml-2 text-xs opacity-75">[Task: {task.taskId}]</span>
+                                          </span>
+                                          <span className="text-xs">{task.thoughts.length} thought(s)</span>
+                                        </div>
+                                        {(() => {
+                                          const impact = aggregateEnvironmentalImpact(task.thoughts);
+                                          if (!impact) return null;
+                                          return (
+                                            <div className="flex gap-4 text-xs opacity-90">
+                                              <div className="flex items-center gap-1">
+                                                <span>Carbon:</span>
+                                                <span className="font-mono">{formatCarbonEmissions(impact.carbonGrams)}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                <span>Water:</span>
+                                                <span className="font-mono">{formatWaterUsage(impact.waterMl)}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                <span>{impact.tokens.toLocaleString()} tokens</span>
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
                                       </div>
                                     </summary>
                                     <div className="p-3 space-y-2 bg-gray-50">
@@ -1180,9 +1238,30 @@ export default function InteractPage() {
                           return (
                             <details key={`task-${task.taskId}`} className="border rounded-lg">
                               <summary className={`cursor-pointer p-3 ${task.color} text-white rounded-t-lg ${task.completed ? 'opacity-60' : ''}`}>
-                                <div className="flex justify-between items-center">
-                                  <span className="font-medium">{task.description || task.taskId.slice(-8)}</span>
-                                  <span className="text-xs">{task.thoughts.length} thought(s)</span>
+                                <div className="space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-medium">{task.description || task.taskId.slice(-8)}</span>
+                                    <span className="text-xs">{task.thoughts.length} thought(s)</span>
+                                  </div>
+                                  {(() => {
+                                    const impact = aggregateEnvironmentalImpact(task.thoughts);
+                                    if (!impact) return null;
+                                    return (
+                                      <div className="flex gap-4 text-xs opacity-90">
+                                        <div className="flex items-center gap-1">
+                                          <span>Carbon:</span>
+                                          <span className="font-mono">{formatCarbonEmissions(impact.carbonGrams)}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span>Water:</span>
+                                          <span className="font-mono">{formatWaterUsage(impact.waterMl)}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <span>{impact.tokens.toLocaleString()} tokens</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </summary>
                               <div className="p-3 space-y-2 bg-gray-50">
