@@ -8,10 +8,12 @@
  * 1. WUE (Water Usage Effectiveness) based calculation
  * 2. Per-token estimation adjusted for model size
  *
- * @param energyKwh - Energy consumed in kilowatt-hours
+ * @param energyKwh - Energy consumed in kilowatt-hours (kWh)
+ *                    Note: If your source data is in mWh (milliwatt-hours), divide by 1,000,000
+ *                    If your source data is in Wh (watt-hours), divide by 1,000
  * @param tokensTotal - Total number of tokens processed
  * @param modelSizeB - Model size in billions of parameters (default: 17 for Llama-4-Maverick-17B)
- * @returns Water usage in milliliters
+ * @returns Water usage in milliliters (ml)
  */
 export function calculateWaterUsage(
   energyKwh: number,

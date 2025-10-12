@@ -319,7 +319,7 @@ export default function InteractPage() {
     if (count === 0) return null;
 
     // Calculate total water usage
-    const energyKwh = totalEnergyMwh / 1000;
+    const energyKwh = totalEnergyMwh / 1000000; // Convert mWh (milliwatt-hours) to kWh
     const waterMl = calculateWaterUsage(energyKwh, totalTokens);
 
     return {
@@ -675,7 +675,7 @@ export default function InteractPage() {
       // Calculate water usage if we have the necessary data
       let waterMl = null;
       if (energyMwh !== null && tokensTotal !== null) {
-        const energyKwh = energyMwh / 1000; // Convert mWh to kWh
+        const energyKwh = energyMwh / 1000000; // Convert mWh (milliwatt-hours) to kWh
         waterMl = calculateWaterUsage(energyKwh, tokensTotal);
       }
 
