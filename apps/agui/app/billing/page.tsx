@@ -119,7 +119,7 @@ function PaymentForm({
   onCancel
 }: {
   purchaseInfo: PurchaseResponse;
-  onSuccess: () => void;
+  onSuccess: (paymentId: string) => void;
   onError: (error: string) => void;
   onCancel: () => void;
 }) {
@@ -153,8 +153,9 @@ function PaymentForm({
 
       if (error) {
         onError(error.message || 'Payment failed');
-      } else if (paymentIntent?.status === 'succeeded') {
-        onSuccess();
+      } else if (paymentIntent?.status === 'succeeded' || paymentIntent?.status === 'processing') {
+        // Payment confirmed by Stripe, now poll backend for credit addition
+        onSuccess(purchaseInfo.payment_id);
       }
     } catch (err) {
       onError('An unexpected error occurred');
@@ -234,6 +235,7 @@ function PurchaseModal({
   const [error, setError] = useState<string | null>(null);
   const [purchaseInfo, setPurchaseInfo] = useState<PurchaseResponse | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [creditsAdded, setCreditsAdded] = useState<number>(0);
 
   const initiatePurchase = async () => {
     setStep('payment');
@@ -253,12 +255,50 @@ function PurchaseModal({
     }
   };
 
-  const handlePaymentSuccess = () => {
-    setStep('success');
-    setTimeout(() => {
-      onSuccess();
-      onClose();
-    }, 2000);
+  const pollPaymentStatus = async (paymentId: string) => {
+    const maxAttempts = 30;
+    const pollInterval = 2000; // 2 seconds
+
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const client = new CIRISClient();
+        const status = await client.billing.getPurchaseStatus(paymentId);
+
+        if (status.status === 'succeeded') {
+          // Success - credits added
+          setCreditsAdded(status.credits_added);
+          setStep('success');
+          setTimeout(() => {
+            onSuccess();
+            onClose();
+          }, 2000);
+          return;
+        }
+
+        if (status.status === 'failed' || status.status === 'canceled') {
+          // Payment failed
+          setError(`Payment ${status.status}. Please try again.`);
+          setStep('error');
+          return;
+        }
+
+        // Continue polling for processing/pending/requires_* states
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      } catch (err) {
+        console.error('Error polling payment status:', err);
+        // Continue polling despite errors
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+      }
+    }
+
+    // Timeout after max attempts
+    setError('Payment status unknown after 60 seconds. Please check your credit balance or contact support.');
+    setStep('error');
+  };
+
+  const handlePaymentSuccess = (paymentId: string) => {
+    setStep('processing');
+    pollPaymentStatus(paymentId);
   };
 
   const handlePaymentError = (errorMessage: string) => {
@@ -334,17 +374,18 @@ function PurchaseModal({
         {step === 'processing' && (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600 mt-4">Processing payment...</p>
+            <p className="text-gray-600 mt-4">Processing payment and adding credits...</p>
+            <p className="text-gray-500 text-sm mt-2">This may take a few moments</p>
           </div>
         )}
 
         {/* Success Step */}
-        {step === 'success' && purchaseInfo && (
+        {step === 'success' && (
           <div className="text-center py-8">
             <div className="text-6xl mb-4">✓</div>
             <h3 className="text-2xl font-bold text-green-600 mb-2">Purchase Successful!</h3>
             <p className="text-gray-700">
-              {purchaseInfo.uses_purchased} uses added to your account
+              {creditsAdded} {creditsAdded === 1 ? 'use' : 'uses'} added to your account
             </p>
           </div>
         )}

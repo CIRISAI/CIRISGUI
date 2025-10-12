@@ -29,10 +29,21 @@ export interface PurchaseInitiateResponse {
   publishable_key: string;
 }
 
+export type PaymentStatus =
+  | 'succeeded'       // Payment complete, credits added
+  | 'processing'      // Payment being processed
+  | 'pending'         // Awaiting payment confirmation
+  | 'requires_payment_method'  // Payment method required
+  | 'requires_confirmation'    // Requires confirmation
+  | 'requires_action' // User action required (3D Secure)
+  | 'failed'          // Payment failed
+  | 'canceled'        // Payment canceled
+  | 'unknown';        // Status unknown
+
 export interface PurchaseStatusResponse {
-  status: 'succeeded' | 'pending' | 'failed';
+  status: PaymentStatus;
   credits_added: number;
-  balance_after: number | null;
+  balance_after: number;
 }
 
 export class BillingResource extends BaseResource {
@@ -41,7 +52,7 @@ export class BillingResource extends BaseResource {
    * @returns Credit status information
    */
   async getCredits(): Promise<CreditStatus> {
-    return this.transport.get<CreditStatus>('/v1/api/credits');
+    return this.transport.get<CreditStatus>('/v1/api/billing/credits');
   }
 
   /**
@@ -51,7 +62,7 @@ export class BillingResource extends BaseResource {
    */
   async initiatePurchase(request?: PurchaseInitiateRequest): Promise<PurchaseInitiateResponse> {
     return this.transport.post<PurchaseInitiateResponse>(
-      '/v1/api/purchase/initiate',
+      '/v1/api/billing/purchase/initiate',
       request || {}
     );
   }
@@ -63,7 +74,7 @@ export class BillingResource extends BaseResource {
    */
   async getPurchaseStatus(paymentId: string): Promise<PurchaseStatusResponse> {
     return this.transport.get<PurchaseStatusResponse>(
-      `/v1/api/purchase/status/${paymentId}`
+      `/v1/api/billing/purchase/status/${paymentId}`
     );
   }
 }
