@@ -682,7 +682,7 @@ export default function InteractPage() {
       const hasEnvironmentalData = carbonGrams !== null || waterMl !== null;
 
       const otherFields = Object.keys(data).filter(
-        key => !['action_executed', 'execution_success', 'audit_entry_hash', 'tokens_total', 'tokens_input', 'tokens_output', 'carbon_grams', 'energy_mwh', 'cost_cents'].includes(key)
+        key => !['action_executed', 'execution_success', 'audit_entry_hash'].includes(key)
       );
 
       return (
