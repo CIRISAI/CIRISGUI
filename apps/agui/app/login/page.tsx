@@ -414,6 +414,9 @@ export default function LoginPage() {
                   placeholder="Enter password"
                   disabled={loading}
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Default credentials: <span className="font-mono font-medium">admin</span> / <span className="font-mono font-medium">ciris_admin_password</span>
+                </p>
               </div>
 
               <button
