@@ -325,7 +325,7 @@ export default function LoginPage() {
                         <strong>Log in with a Google account</strong> to observe the production agents
                       </li>
                       <li>
-                        <strong>Log in with a @ciris.ai email address</strong> to access the admin or manager interfaces
+                        <strong>Lens and Manager access</strong> require administrator privileges
                       </li>
                     </ul>
                   </div>
@@ -465,7 +465,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Public Dashboard Link */}
+              {/* Lens Dashboard Link */}
               <div className="mt-6">
                 <div className="text-center">
                   <a
@@ -475,10 +475,10 @@ export default function LoginPage() {
                     <svg className="w-4 h-4 mr-2 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
-                    View System Dashboard
+                    Lens Dashboard
                   </a>
                   <p className="mt-2 text-xs text-gray-500">
-                    Public telemetry and system metrics
+                    Admin access required
                   </p>
                 </div>
               </div>
@@ -487,7 +487,7 @@ export default function LoginPage() {
               <div className="mt-8 pt-8 border-t border-gray-200">
                 <div className="text-center">
                   <p className="text-sm text-gray-600 mb-4">
-                    System administrators with @ciris.ai accounts
+                    Admin access required
                   </p>
                   <button
                     type="button"
