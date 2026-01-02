@@ -10,6 +10,64 @@ import { useAgent } from '../../contexts/AgentContextHybrid';
 import { NoAgentsPlaceholder } from '../../components/NoAgentsPlaceholder';
 import { extractErrorMessage, getDiscordInvite } from '../../lib/utils/error-helpers';
 import { ErrorModal } from '../../components/ErrorModal';
+import type { ConversationMessage, MessageType } from '../../lib/ciris-sdk/types';
+
+// Helper to get effective message type (backward compatible with is_agent)
+function getEffectiveMessageType(msg: ConversationMessage): MessageType {
+  if (msg.message_type) return msg.message_type;
+  return msg.is_agent ? 'agent' : 'user';
+}
+
+// Helper to get message styles based on type
+function getMessageStyles(type: MessageType) {
+  switch (type) {
+    case 'user':
+      return {
+        container: 'justify-end',
+        bubble: 'bg-blue-600 text-white',
+        meta: 'text-blue-100',
+        icon: null,
+      };
+    case 'agent':
+      return {
+        container: 'justify-start',
+        bubble: 'bg-white border border-gray-200',
+        meta: 'text-gray-500',
+        icon: null,
+      };
+    case 'system':
+      return {
+        container: 'justify-center',
+        bubble: 'bg-blue-50 border border-blue-200 text-blue-700',
+        meta: 'text-blue-500',
+        icon: 'info',
+      };
+    case 'error':
+      return {
+        container: 'justify-center',
+        bubble: 'bg-red-50 border border-red-200 text-red-700',
+        meta: 'text-red-500',
+        icon: 'warning',
+      };
+  }
+}
+
+// Icon components for system/error messages
+function InfoIcon() {
+  return (
+    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
+function WarningIcon() {
+  return (
+    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+    </svg>
+  );
+}
 
 export default function CommsPage() {
   const { user } = useAuth();
@@ -212,22 +270,33 @@ export default function CommsPage() {
                   // Debug log to see message structure
                   if (idx === 0) console.log('Message structure:', msg);
 
+                  const msgType = getEffectiveMessageType(msg);
+                  const styles = getMessageStyles(msgType);
+
+                  // Determine author display
+                  const authorDisplay = msg.author || (
+                    msgType === 'user' ? 'You' :
+                    msgType === 'agent' ? 'CIRIS' :
+                    msgType === 'system' ? 'System' :
+                    'Error'
+                  );
+
                   return (
                     <div
                       key={msg.id || idx}
-                      className={`flex ${msg.is_agent ? 'justify-start' : 'justify-end'}`}
+                      className={`flex ${styles.container}`}
                     >
                       <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          msg.is_agent
-                            ? 'bg-white border border-gray-200'
-                            : 'bg-blue-600 text-white'
-                        }`}
+                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${styles.bubble}`}
                       >
-                        <div className={`text-xs mb-1 ${msg.is_agent ? 'text-gray-500' : 'text-blue-100'}`}>
-                          {msg.author || (msg.is_agent ? 'CIRIS' : 'You')} • {new Date(msg.timestamp).toLocaleTimeString()}
+                        <div className={`text-xs mb-1 ${styles.meta}`}>
+                          {authorDisplay} • {new Date(msg.timestamp).toLocaleTimeString()}
                         </div>
-                        <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                        <div className="text-sm whitespace-pre-wrap flex items-start">
+                          {styles.icon === 'info' && <InfoIcon />}
+                          {styles.icon === 'warning' && <WarningIcon />}
+                          <span>{msg.content}</span>
+                        </div>
                       </div>
                     </div>
                   );

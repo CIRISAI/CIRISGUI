@@ -163,6 +163,8 @@ export interface ResourceLimit {
 }
 
 // Conversation Types
+export type MessageType = 'user' | 'agent' | 'system' | 'error';
+
 export interface ConversationMessage {
   id: string;
   content: string;
@@ -171,6 +173,7 @@ export interface ConversationMessage {
   channel_id: string;
   timestamp: string;
   is_agent: boolean;
+  message_type?: MessageType;  // Optional for backward compatibility
 }
 
 export interface ConversationHistory {
