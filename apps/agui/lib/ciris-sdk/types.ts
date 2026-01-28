@@ -163,6 +163,8 @@ export interface ResourceLimit {
 }
 
 // Conversation Types
+export type MessageType = 'user' | 'agent' | 'system' | 'error';
+
 export interface ConversationMessage {
   id: string;
   content: string;
@@ -171,6 +173,7 @@ export interface ConversationMessage {
   channel_id: string;
   timestamp: string;
   is_agent: boolean;
+  message_type?: MessageType;  // Optional for backward compatibility
 }
 
 export interface ConversationHistory {
@@ -405,6 +408,22 @@ export interface ActionSelectionDMAResult {
   action_parameters: Record<string, any>;
   reasoning: string;
   confidence_level: number;
+}
+
+// V1.9.3: Identity DMA Result (separate from DMA_RESULTS)
+export interface IDMAResult {
+  k_eff: number;              // Effective identity coherence
+  correlation_risk: number;   // Risk of identity drift
+  fragility_flag: boolean;    // Identity stability warning
+  phase: string;              // Current identity phase
+}
+
+// V1.9.3: Tool-Specific ASPDMA Result (for TOOL actions)
+export interface TSASPDMAResult {
+  tool_name: string;
+  tool_parameters: Record<string, any>;
+  reasoning: string;
+  approved: boolean;
 }
 
 export interface ConscienceResult {
