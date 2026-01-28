@@ -412,18 +412,20 @@ export interface ActionSelectionDMAResult {
 
 // V1.9.3: Identity DMA Result (separate from DMA_RESULTS)
 export interface IDMAResult {
-  k_eff: number;              // Effective identity coherence
-  correlation_risk: number;   // Risk of identity drift
-  fragility_flag: boolean;    // Identity stability warning
-  phase: string;              // Current identity phase
+  is_fragile: boolean;                    // Identity stability warning
+  fragility_reason: string | null;        // Why identity is fragile (if is_fragile=true)
+  epistemic_humility: number;             // 0-1 confidence score
+  diversity_score: number;                // DMA agreement score (0-1)
+  correlation_factors: string[];          // Factors influencing the decision
 }
 
 // V1.9.3: Tool-Specific ASPDMA Result (for TOOL actions)
 export interface TSASPDMAResult {
-  tool_name: string;
-  tool_parameters: Record<string, any>;
-  reasoning: string;
-  approved: boolean;
+  original_tool_name: string;             // Originally requested tool
+  final_action: 'tool' | 'speak' | 'ponder';  // Final action after validation
+  final_tool_name: string;                // Approved tool name (may differ from original)
+  final_parameters: Record<string, any>;  // Approved tool parameters
+  tsaspdma_rationale: string;             // Reasoning for approval/rejection
 }
 
 export interface ConscienceResult {
