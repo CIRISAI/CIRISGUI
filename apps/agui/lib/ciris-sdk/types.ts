@@ -410,6 +410,22 @@ export interface ActionSelectionDMAResult {
   confidence_level: number;
 }
 
+// V1.9.3: Identity DMA Result (separate from DMA_RESULTS)
+export interface IDMAResult {
+  k_eff: number;              // Effective identity coherence
+  correlation_risk: number;   // Risk of identity drift
+  fragility_flag: boolean;    // Identity stability warning
+  phase: string;              // Current identity phase
+}
+
+// V1.9.3: Tool-Specific ASPDMA Result (for TOOL actions)
+export interface TSASPDMAResult {
+  tool_name: string;
+  tool_parameters: Record<string, any>;
+  reasoning: string;
+  approved: boolean;
+}
+
 export interface ConscienceResult {
   conscience_name: string;
   passed: boolean;
