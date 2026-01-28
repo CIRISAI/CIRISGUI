@@ -261,7 +261,7 @@ export default function InteractPage() {
     sendMessageMutation.mutate(msgToSend);
   };
 
-  const stageNames = ['thought_start', 'snapshot_and_context', 'dma_results', 'idma_result', 'aspdma_result', 'tsaspdma_result', 'conscience_result', 'action_result'];
+  const stageNames = ['thought_start', 'snapshot_and_context', 'dma_results', 'idma_result', 'tsaspdma_result', 'aspdma_result', 'conscience_result', 'action_result'];
 
   // Get stage number based on position
   const getStageNumber = (stageName: string): string => {
@@ -501,30 +501,34 @@ export default function InteractPage() {
 
     // Special rendering for idma_result (V1.9.3: Identity DMA)
     if (stageName === 'idma_result') {
-      const kEff = data.k_eff ?? null;
-      const correlationRisk = data.correlation_risk ?? null;
-      const fragilityFlag = data.fragility_flag ?? false;
-      const phase = data.phase || 'unknown';
+      const isFragile = data.is_fragile ?? false;
+      const fragilityReason = data.fragility_reason ?? null;
+      const epistemicHumility = data.epistemic_humility ?? null;
+      const diversityScore = data.diversity_score ?? null;
+      const correlationFactors = data.correlation_factors ?? [];
 
       // Thresholds for identity stability
-      const kEffOk = kEff !== null && kEff > 0.7;
-      const correlationRiskOk = correlationRisk !== null && correlationRisk < 0.3;
+      const epistemicOk = epistemicHumility !== null && epistemicHumility > 0.7;
+      const diversityOk = diversityScore !== null && diversityScore > 0.5;
 
       const otherFields = Object.keys(data).filter(
-        key => !['k_eff', 'correlation_risk', 'fragility_flag', 'phase'].includes(key)
+        key => !['is_fragile', 'fragility_reason', 'epistemic_humility', 'diversity_score', 'correlation_factors'].includes(key)
       );
 
       return (
         <div className="space-y-3">
           {/* Identity Status Header */}
           <div className={`flex items-center gap-3 border rounded-lg p-3 ${
-            fragilityFlag ? 'bg-orange-50 border-orange-200' : 'bg-purple-50 border-purple-200'
+            isFragile ? 'bg-orange-50 border-orange-200' : 'bg-purple-50 border-purple-200'
           }`}>
             <div className="flex-1">
-              <div className={`font-bold text-xl ${fragilityFlag ? 'text-orange-900' : 'text-purple-900'}`}>
-                Identity Phase: {phase.toUpperCase()}
+              <div className={`font-bold text-xl ${isFragile ? 'text-orange-900' : 'text-purple-900'}`}>
+                Identity Check: {isFragile ? 'FRAGILE' : 'STABLE'}
               </div>
-              {fragilityFlag && (
+              {isFragile && fragilityReason && (
+                <div className="text-sm text-orange-700 mt-1">⚠️ {fragilityReason}</div>
+              )}
+              {isFragile && !fragilityReason && (
                 <div className="text-sm text-orange-700 mt-1">⚠️ Fragility Warning Active</div>
               )}
             </div>
@@ -534,21 +538,35 @@ export default function InteractPage() {
           <div>
             <div className="text-purple-600 font-semibold mb-2">Identity Coherence Metrics:</div>
             <div className="grid grid-cols-2 gap-2">
-              {/* k_eff */}
-              <div className={`p-2 rounded border ${kEffOk ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                <div className="text-xs font-medium text-gray-600">k_eff (Coherence)</div>
-                <div className="text-lg font-bold">{kEff !== null ? kEff.toFixed(3) : 'N/A'}</div>
-                <div className="text-xs text-gray-500">{kEffOk ? '✓ > 0.7' : '⚠ Should be > 0.7'}</div>
+              {/* Epistemic Humility */}
+              <div className={`p-2 rounded border ${epistemicOk ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="text-xs font-medium text-gray-600">Epistemic Humility</div>
+                <div className="text-lg font-bold">{epistemicHumility !== null ? (epistemicHumility * 100).toFixed(0) + '%' : 'N/A'}</div>
+                <div className="text-xs text-gray-500">{epistemicOk ? '✓ High confidence' : '⚠ Low confidence'}</div>
               </div>
 
-              {/* Correlation Risk */}
-              <div className={`p-2 rounded border ${correlationRiskOk ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                <div className="text-xs font-medium text-gray-600">Correlation Risk</div>
-                <div className="text-lg font-bold">{correlationRisk !== null ? correlationRisk.toFixed(3) : 'N/A'}</div>
-                <div className="text-xs text-gray-500">{correlationRiskOk ? '✓ < 0.3' : '⚠ Should be < 0.3'}</div>
+              {/* Diversity Score */}
+              <div className={`p-2 rounded border ${diversityOk ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <div className="text-xs font-medium text-gray-600">DMA Diversity</div>
+                <div className="text-lg font-bold">{diversityScore !== null ? (diversityScore * 100).toFixed(0) + '%' : 'N/A'}</div>
+                <div className="text-xs text-gray-500">{diversityOk ? '✓ Good agreement' : '⚠ Low agreement'}</div>
               </div>
             </div>
           </div>
+
+          {/* Correlation Factors */}
+          {correlationFactors.length > 0 && (
+            <div>
+              <div className="text-purple-600 font-semibold mb-2">Correlation Factors:</div>
+              <div className="flex flex-wrap gap-1">
+                {correlationFactors.map((factor: string, idx: number) => (
+                  <span key={idx} className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
+                    {factor}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Other fields under "View details" */}
           {otherFields.length > 0 && (
@@ -622,45 +640,62 @@ export default function InteractPage() {
 
     // Special rendering for tsaspdma_result (V1.9.3: Tool-Specific ASPDMA)
     if (stageName === 'tsaspdma_result') {
-      const toolName = data.tool_name || 'UNKNOWN';
-      const toolParameters = data.tool_parameters || {};
-      const reasoning = data.reasoning || data.tsaspdma_reasoning || '';
-      const approved = data.approved ?? data.tsaspdma_approved ?? null;
+      const originalToolName = data.original_tool_name || 'UNKNOWN';
+      const finalAction = data.final_action || 'tool'; // "tool", "speak", or "ponder"
+      const finalToolName = data.final_tool_name || originalToolName;
+      const finalParameters = data.final_parameters || {};
+      const rationale = data.tsaspdma_rationale || '';
+
+      // Derive status from final_action
+      const isApproved = finalAction === 'tool';
+      const needsClarification = finalAction === 'speak';
+      const isReconsidering = finalAction === 'ponder';
 
       const otherFields = Object.keys(data).filter(
-        key => !['tool_name', 'tool_parameters', 'reasoning', 'tsaspdma_reasoning', 'approved', 'tsaspdma_approved'].includes(key)
+        key => !['original_tool_name', 'final_action', 'final_tool_name', 'final_parameters', 'tsaspdma_rationale'].includes(key)
       );
 
       return (
         <div className="space-y-3">
-          {/* Tool Selection Header */}
+          {/* Tool Validation Header */}
           <div className={`flex items-center gap-3 border rounded-lg p-3 ${
-            approved === true ? 'bg-green-50 border-green-200' :
-            approved === false ? 'bg-red-50 border-red-200' :
+            isApproved ? 'bg-green-50 border-green-200' :
+            needsClarification ? 'bg-yellow-50 border-yellow-200' :
+            isReconsidering ? 'bg-blue-50 border-blue-200' :
             'bg-cyan-50 border-cyan-200'
           }`}>
             <div className="flex-1">
               <div className={`font-bold text-xl ${
-                approved === true ? 'text-green-900' :
-                approved === false ? 'text-red-900' :
+                isApproved ? 'text-green-900' :
+                needsClarification ? 'text-yellow-900' :
+                isReconsidering ? 'text-blue-900' :
                 'text-cyan-900'
               }`}>
-                🔧 {toolName}
+                🔧 Tool Validation
               </div>
-              {approved !== null && (
-                <div className={`text-sm mt-1 ${approved ? 'text-green-700' : 'text-red-700'}`}>
-                  {approved ? '✓ Approved for execution' : '✗ Not approved'}
-                </div>
-              )}
+              <div className="text-sm mt-1">
+                <span className="font-medium">Tool:</span> {finalToolName}
+                {originalToolName !== finalToolName && (
+                  <span className="text-gray-500 ml-2">(was: {originalToolName})</span>
+                )}
+              </div>
+              <div className={`text-sm mt-1 font-medium ${
+                isApproved ? 'text-green-700' :
+                needsClarification ? 'text-yellow-700' :
+                isReconsidering ? 'text-blue-700' :
+                'text-gray-700'
+              }`}>
+                Status: {isApproved ? '✅ Approved' : needsClarification ? '⚠️ Needs Clarification' : isReconsidering ? '🔄 Reconsidering' : 'Unknown'}
+              </div>
             </div>
           </div>
 
-          {/* Tool Parameters */}
-          {Object.keys(toolParameters).length > 0 && (
+          {/* Final Parameters */}
+          {Object.keys(finalParameters).length > 0 && (
             <div>
-              <div className="text-cyan-600 font-semibold mb-2">Tool Parameters:</div>
+              <div className="text-cyan-600 font-semibold mb-2">Final Parameters:</div>
               <div className="ml-2 bg-gray-50 rounded p-2 border">
-                {Object.entries(toolParameters).map(([key, value]) => (
+                {Object.entries(finalParameters).map(([key, value]) => (
                   <div key={key} className="py-1">
                     <span className="text-cyan-600 font-medium text-xs mr-2">{key}:</span>
                     {renderExpandableData(value, 2)}
@@ -671,11 +706,11 @@ export default function InteractPage() {
           )}
 
           {/* Reasoning */}
-          {reasoning && (
+          {rationale && (
             <div>
               <div className="text-cyan-600 font-semibold mb-2">Reasoning:</div>
               <div className="ml-2 text-gray-700 whitespace-pre-wrap">
-                {reasoning}
+                {rationale}
               </div>
             </div>
           )}
@@ -1342,12 +1377,12 @@ export default function InteractPage() {
                                                     {/* Show IDMA indicator */}
                                                     {stageName === 'idma_result' && (
                                                       <span className={`mr-2 px-1.5 py-0.5 rounded text-xs font-bold ${
-                                                        stage.data?.fragility_flag
+                                                        stage.data?.is_fragile
                                                           ? 'bg-orange-100 text-orange-800'
                                                           : 'bg-purple-100 text-purple-800'
-                                                      }`} title={`k_eff: ${stage.data?.k_eff?.toFixed(3) || 'N/A'}`}>
-                                                        {stage.data?.phase?.toUpperCase() || 'IDMA'}
-                                                        {stage.data?.fragility_flag && <span className="ml-1" title="Fragility Warning">⚠️</span>}
+                                                      }`} title={`Confidence: ${stage.data?.epistemic_humility ? (stage.data.epistemic_humility * 100).toFixed(0) + '%' : 'N/A'}`}>
+                                                        {stage.data?.is_fragile ? 'FRAGILE' : `${stage.data?.epistemic_humility ? (stage.data.epistemic_humility * 100).toFixed(0) + '%' : 'IDMA'}`}
+                                                        {stage.data?.is_fragile && <span className="ml-1" title="Fragility Warning">⚠️</span>}
                                                       </span>
                                                     )}
                                                     {/* Show action label for ASPDMA */}
@@ -1360,15 +1395,18 @@ export default function InteractPage() {
                                                     {/* Show TSASPDMA tool indicator */}
                                                     {stageName === 'tsaspdma_result' && (
                                                       <span className={`mr-2 px-1.5 py-0.5 rounded text-xs font-bold ${
-                                                        stage.data?.approved === true
+                                                        stage.data?.final_action === 'tool'
                                                           ? 'bg-green-100 text-green-800'
-                                                          : stage.data?.approved === false
-                                                            ? 'bg-red-100 text-red-800'
-                                                            : 'bg-cyan-100 text-cyan-800'
-                                                      }`} title={`Tool: ${stage.data?.tool_name || 'Unknown'}`}>
-                                                        🔧 {stage.data?.tool_name || 'TOOL'}
-                                                        {stage.data?.approved === true && <span className="ml-1">✓</span>}
-                                                        {stage.data?.approved === false && <span className="ml-1">✗</span>}
+                                                          : stage.data?.final_action === 'speak'
+                                                            ? 'bg-yellow-100 text-yellow-800'
+                                                            : stage.data?.final_action === 'ponder'
+                                                              ? 'bg-blue-100 text-blue-800'
+                                                              : 'bg-cyan-100 text-cyan-800'
+                                                      }`} title={`Tool: ${stage.data?.final_tool_name || stage.data?.original_tool_name || 'Unknown'}`}>
+                                                        🔧 {stage.data?.final_tool_name || stage.data?.original_tool_name || 'TOOL'}
+                                                        {stage.data?.final_action === 'tool' && <span className="ml-1">✓</span>}
+                                                        {stage.data?.final_action === 'speak' && <span className="ml-1">⚠</span>}
+                                                        {stage.data?.final_action === 'ponder' && <span className="ml-1">🔄</span>}
                                                       </span>
                                                     )}
                                                     {/* Show conscience status */}
@@ -1621,12 +1659,12 @@ export default function InteractPage() {
                                               {/* Show IDMA indicator */}
                                               {stageName === 'idma_result' && (
                                                 <span className={`mr-2 px-1.5 py-0.5 rounded text-xs font-bold ${
-                                                  stage.data?.fragility_flag
+                                                  stage.data?.is_fragile
                                                     ? 'bg-orange-100 text-orange-800'
                                                     : 'bg-purple-100 text-purple-800'
-                                                }`} title={`k_eff: ${stage.data?.k_eff?.toFixed(3) || 'N/A'}`}>
-                                                  {stage.data?.phase?.toUpperCase() || 'IDMA'}
-                                                  {stage.data?.fragility_flag && <span className="ml-1" title="Fragility Warning">⚠️</span>}
+                                                }`} title={`Confidence: ${stage.data?.epistemic_humility ? (stage.data.epistemic_humility * 100).toFixed(0) + '%' : 'N/A'}`}>
+                                                  {stage.data?.is_fragile ? 'FRAGILE' : `${stage.data?.epistemic_humility ? (stage.data.epistemic_humility * 100).toFixed(0) + '%' : 'IDMA'}`}
+                                                  {stage.data?.is_fragile && <span className="ml-1" title="Fragility Warning">⚠️</span>}
                                                 </span>
                                               )}
                                               {/* Show action label for ASPDMA */}
@@ -1639,15 +1677,18 @@ export default function InteractPage() {
                                               {/* Show TSASPDMA tool indicator */}
                                               {stageName === 'tsaspdma_result' && (
                                                 <span className={`mr-2 px-1.5 py-0.5 rounded text-xs font-bold ${
-                                                  stage.data?.approved === true
+                                                  stage.data?.final_action === 'tool'
                                                     ? 'bg-green-100 text-green-800'
-                                                    : stage.data?.approved === false
-                                                      ? 'bg-red-100 text-red-800'
-                                                      : 'bg-cyan-100 text-cyan-800'
-                                                }`} title={`Tool: ${stage.data?.tool_name || 'Unknown'}`}>
-                                                  🔧 {stage.data?.tool_name || 'TOOL'}
-                                                  {stage.data?.approved === true && <span className="ml-1">✓</span>}
-                                                  {stage.data?.approved === false && <span className="ml-1">✗</span>}
+                                                    : stage.data?.final_action === 'speak'
+                                                      ? 'bg-yellow-100 text-yellow-800'
+                                                      : stage.data?.final_action === 'ponder'
+                                                        ? 'bg-blue-100 text-blue-800'
+                                                        : 'bg-cyan-100 text-cyan-800'
+                                                }`} title={`Tool: ${stage.data?.final_tool_name || stage.data?.original_tool_name || 'Unknown'}`}>
+                                                  🔧 {stage.data?.final_tool_name || stage.data?.original_tool_name || 'TOOL'}
+                                                  {stage.data?.final_action === 'tool' && <span className="ml-1">✓</span>}
+                                                  {stage.data?.final_action === 'speak' && <span className="ml-1">⚠</span>}
+                                                  {stage.data?.final_action === 'ponder' && <span className="ml-1">🔄</span>}
                                                 </span>
                                               )}
                                               {/* Show conscience status */}
