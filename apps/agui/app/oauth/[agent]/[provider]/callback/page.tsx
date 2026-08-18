@@ -125,10 +125,25 @@ function OAuthCallbackContent() {
           router.push(returnUrl);
         }
       } else {
-        // If no token, redirect with error
+        // NO TOKEN, BUT NO ERROR EITHER — these are not the same failure.
+        //
+        // `error` is null here: the provider did not reject anything. The
+        // callback simply arrived without the credential this page needs, which
+        // is what a node does when it completes the sign-in and keeps the
+        // session rather than echoing it back in the URL. Reporting that as
+        // `oauth_failed` tells the user Google turned them away, sends them to
+        // re-authenticate, and hides the fact that they are already signed in as
+        // far as the node is concerned. Give it its own code so the message can
+        // say what actually happened.
+        // /account renders `description || error` straight into a toast, so
+        // without one it would show the user the literal string "no_session".
+        // /login maps the code to its own sentence and needs no description.
+        const noSessionDetail = encodeURIComponent(
+          "the sign-in completed but this agent returned no session to your browser"
+        );
         const redirectUrl = isLinking
-          ? `/account?error=oauth_failed&provider=${provider}&agent=${agentId}`
-          : `/login?error=oauth_failed&provider=${provider}&agent=${agentId}`;
+          ? `/account?error=no_session&provider=${provider}&agent=${agentId}&description=${noSessionDetail}`
+          : `/login?error=no_session&provider=${provider}&agent=${agentId}`;
         router.push(redirectUrl);
       }
     };
