@@ -19,7 +19,44 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [betaAcknowledged, setBetaAcknowledged] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const [redirectNotice, setRedirectNotice] = useState<string | null>(null);
   const { login } = useAuth();
+
+  // SURFACE THE REASON WE WERE SENT BACK HERE.
+  //
+  // The OAuth callback redirects to `/login?error=...` on every failure path,
+  // and nothing on this page ever read it — so a user whose sign-in did not
+  // complete landed on a blank form with no explanation at all, and no way to
+  // tell a rejected login from one that succeeded and simply did not hand back
+  // a session.
+  //
+  // Read from window.location rather than useSearchParams(): this is a client
+  // component, and useSearchParams() forces a Suspense boundary at build time
+  // for static rendering. An effect runs client-side only, so it needs neither.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("error");
+    if (!code) return;
+
+    const provider = params.get("provider");
+    const named = provider
+      ? provider.charAt(0).toUpperCase() + provider.slice(1)
+      : "The provider";
+    const detail = params.get("description");
+
+    const messages: Record<string, string> = {
+      // Sign-in worked; the node kept the session instead of returning it to
+      // this browser. Telling the user to try again is useless — the same thing
+      // happens every time — so say what is actually true.
+      no_session: `${named} sign-in completed, but this agent did not return a session to your browser. Your account was not rejected. If you are using the desktop app, sign in from the app itself; otherwise this agent may not be configured to allow sign-in from a web browser.`,
+      // A real refusal from the provider.
+      oauth_failed: `${named} sign-in did not complete.`,
+    };
+
+    const base = messages[code] ?? `Sign-in did not complete (${code}).`;
+    setRedirectNotice(detail ? `${base} (${detail})` : base);
+  }, []);
 
   // Always show Google and Discord OAuth options
   const oauthProviders = [
@@ -268,6 +305,11 @@ export default function LoginPage() {
           <p className="mt-2 text-center text-sm text-gray-600">
             Select an agent and enter your credentials
           </p>
+          {redirectNotice && (
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+              <p className="text-sm text-amber-700">{redirectNotice}</p>
+            </div>
+          )}
           {error && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
               <p className="text-sm text-red-600">{error.message}</p>

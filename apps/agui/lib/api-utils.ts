@@ -21,18 +21,37 @@ export function detectDeploymentMode(): DeploymentMode {
   const hostname = window.location.hostname;
   const path = window.location.pathname;
 
-  // Check if we're on the production multi-agent domain
-  const isProductionMultiAgent = hostname === 'agents.ciris.ai';
+  // DEPLOYMENT SHAPE IS CONFIGURED, NOT GUESSED FROM A HOSTNAME
+  // (CIRISServer#439).
+  //
+  // This was `hostname === 'agents.ciris.ai'` and nothing else, so exactly ONE
+  // deployment could be managed. Every other hosted node — scout among them —
+  // fell through to standalone and built its API base wrong.
+  //
+  // The literal is KEPT as the default, deliberately: it is the shape
+  // agents.ciris.ai is served in today (GUI at `/`, API at `/api/{agent}`), and
+  // that root-path case has no other signal to read. Removing it outright would
+  // silently move a working deployment into standalone mode. What changes is
+  // that it is no longer the ONLY way to be managed — a deployment now declares
+  // itself with NEXT_PUBLIC_DEPLOYMENT_MODE, and the node states the same fact
+  // authoritatively on GET /v1/auth/oauth/providers (`managed`) for callers
+  // that already have a base URL to ask with. This function runs before one
+  // exists, which is why it reads config and URL rather than asking.
+  const declaredMode = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE;
+  const isProductionMultiAgent =
+    declaredMode === 'managed' ||
+    (declaredMode !== 'standalone' && hostname === 'agents.ciris.ai');
 
-  // Check if path indicates managed mode
-  const isManagedPath = path.startsWith('/agent/');
+  // A path-prefixed gateway is managed whatever host it answers on — the
+  // signal the hostname literal was standing in for.
+  const isManagedPath = path.startsWith('/agent/') || path.startsWith('/api/');
 
   if (isProductionMultiAgent || isManagedPath) {
     // In production or with /agent/ path, we're in managed mode
     let agentId = 'default';
 
     if (isManagedPath) {
-      // Extract from path: /agent/{agent_id}
+      // Extract from path: /agent/{agent_id} or /api/{agent_id}
       const pathParts = path.split('/');
       agentId = pathParts[2] || 'default';
     } else {
