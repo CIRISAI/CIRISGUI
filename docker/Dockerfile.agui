@@ -27,7 +27,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 
 # Health check
+# Exit explicitly: with Next 15.5 / Node 20 the keep-alive socket otherwise holds
+# the probe open until the 3 s timeout and the container is marked unhealthy
+# even while it serves 200. resume() drains the body; errors also exit 1.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error()})" || exit 1
+  CMD node -e "require('http').get('http://localhost:3000', (r) => { r.resume(); process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
 
 CMD ["npm", "run", "start"]
