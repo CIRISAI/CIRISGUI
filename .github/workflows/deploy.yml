@@ -133,46 +133,6 @@ jobs:
             exit 1
           fi
 
-      - name: Direct GUI Deployment (Fallback)
-        if: steps.notify.outputs.success != 'true'
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: 108.61.119.117
-          username: root
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: |
-            set -e
-            
-            echo "Direct deployment fallback - CIRISManager notification failed"
-            
-            # Navigate to deployment directory
-            cd /opt/ciris-gui || cd /home/ciris/CIRISGUI || exit 1
-            
-            # Pull latest image
-            echo "Pulling latest GUI image..."
-            docker pull ghcr.io/${{ github.repository_owner }}/ciris-gui:latest
-            
-            # Update container with zero-downtime deployment
-            echo "Updating GUI container..."
-            docker-compose up -d --no-deps --build ciris-gui
-            
-            # Health check
-            sleep 5
-            if docker ps | grep -q ciris-gui; then
-              echo "✅ GUI container is running"
-            else
-              echo "❌ GUI container failed to start"
-              docker logs ciris-gui --tail 50
-              exit 1
-            fi
-            
-            # Verify application is responding
-            if curl -f -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
-              echo "✅ GUI application is responding"
-            else
-              echo "⚠️ GUI application not responding on port 3000"
-            fi
-
       - name: Monitor Deployment Status
         if: steps.notify.outputs.success == 'true'
         run: |
